@@ -8,10 +8,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.MissingNode;
 import java.io.Serializable;
 import java.util.List;
+
+import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationServiceParameters;
 import org.opentripplanner.ext.flex.FlexParameters;
 import org.opentripplanner.ext.ridehailing.RideHailingServiceParameters;
 import org.opentripplanner.routing.api.request.RouteRequest;
 import org.opentripplanner.standalone.config.framework.json.NodeAdapter;
+import org.opentripplanner.standalone.config.routerconfig.DemandResponsiveTransportationServicesConfig;
 import org.opentripplanner.standalone.config.routerconfig.RideHailingServicesConfig;
 import org.opentripplanner.standalone.config.routerconfig.ServerConfig;
 import org.opentripplanner.standalone.config.routerconfig.TransitRoutingConfig;
@@ -46,6 +49,7 @@ public class RouterConfig implements Serializable {
   private final TransitRoutingConfig transitConfig;
   private final UpdatersParameters updatersParameters;
   private final RideHailingServicesConfig rideHailingConfig;
+  private final DemandResponsiveTransportationServicesConfig demandResponsiveTransportationConfig;
   private final FlexConfig flexConfig;
   private final TransmodelAPIConfig transmodelApi;
   private final VectorTileConfig vectorTileConfig;
@@ -71,6 +75,7 @@ public class RouterConfig implements Serializable {
     this.routingRequestDefaults.initMaxSearchWindow(transitConfig.maxSearchWindow());
     this.updatersParameters = new UpdatersConfig(root);
     this.rideHailingConfig = new RideHailingServicesConfig(root);
+    this.demandResponsiveTransportationConfig = new DemandResponsiveTransportationServicesConfig(root);
     this.vectorTileConfig = VectorTileConfig.mapVectorTilesParameters(root, "vectorTiles");
     this.flexConfig = new FlexConfig(root, "flex");
 
@@ -121,6 +126,10 @@ public class RouterConfig implements Serializable {
 
   public List<RideHailingServiceParameters> rideHailingServiceParameters() {
     return rideHailingConfig.rideHailingServiceParameters();
+  }
+
+  public List<DemandResponsiveTransportationServiceParameters> demandResponsiveTransportationServiceParameters() {
+    return demandResponsiveTransportationConfig.demandResponsiveTransportationServiceParameters();
   }
 
   public VectorTileConfig vectorTileConfig() {
