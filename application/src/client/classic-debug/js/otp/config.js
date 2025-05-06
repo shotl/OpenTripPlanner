@@ -351,7 +351,8 @@ otp.config.modes = {
     //TRANSLATORS: Travel by: mode of transport (Used in selection in Travel Options widgets)
     "FLEX_DIRECT"              : _tr('Direct flex search'),
     "CARPOOL,WALK"             : _tr("Carpool"),
-    "CAR_HAIL,TRANSIT,WALK"    : _tr("Car hailing and transit")
+    "CAR_HAIL,TRANSIT,WALK"    : _tr("Car hailing and transit"),
+    "DEMAND_RESPONSIVE_TRANSPORTATION,TRANSIT,WALK"    : _tr("Demand Responsive Transportation and transit")
 };
 
 let limitTo = _tr("Limit to ");
