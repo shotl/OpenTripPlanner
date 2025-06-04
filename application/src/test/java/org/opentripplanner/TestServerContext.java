@@ -96,6 +96,7 @@ public class TestServerContext {
       raptorConfig,
       createRealtimeVehicleService(transitService),
       List.of(),
+      List.of(),
       request,
       createStreetLimitationParametersService(),
       routerConfig.transitTuningConfig(),

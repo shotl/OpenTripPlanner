@@ -240,6 +240,10 @@
             }
             arrival
           }
+          drtEstimate {
+            rideId
+            arrival
+          }
           accessibilityScore
           id
           realtimeState

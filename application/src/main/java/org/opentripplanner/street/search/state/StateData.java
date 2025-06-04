@@ -1,5 +1,6 @@
 package org.opentripplanner.street.search.state;
 
+import static org.opentripplanner.routing.api.request.StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION;
 import static org.opentripplanner.street.search.state.VehicleRentalState.BEFORE_RENTING;
 import static org.opentripplanner.street.search.state.VehicleRentalState.HAVE_RENTED;
 import static org.opentripplanner.street.search.state.VehicleRentalState.RENTING_FLOATING;
@@ -56,7 +57,13 @@ public class StateData implements Cloneable {
   private StateData(StreetMode requestMode) {
     currentMode = switch (requestMode) {
       // when renting or using a flex vehicle, you start on foot until you have found the vehicle
-      case NOT_SET, WALK, BIKE_RENTAL, SCOOTER_RENTAL, CAR_RENTAL, FLEXIBLE -> TraverseMode.WALK;
+      case NOT_SET,
+        WALK,
+        BIKE_RENTAL,
+        SCOOTER_RENTAL,
+        CAR_RENTAL,
+        FLEXIBLE,
+        DEMAND_RESPONSIVE_TRANSPORTATION -> TraverseMode.WALK;
       // when cycling all the way or to a stop, you start on your own bike
       case BIKE, BIKE_TO_PARK -> TraverseMode.BICYCLE;
       // when driving (not car rental) you start in your own car or your driver's car
@@ -95,7 +102,14 @@ public class StateData implements Cloneable {
 
     var baseCaseDatas =
       switch (request.mode()) {
-        case WALK, BIKE, BIKE_TO_PARK, CAR, CAR_TO_PARK, FLEXIBLE, NOT_SET -> stateDatas;
+        case WALK,
+          BIKE,
+          BIKE_TO_PARK,
+          CAR,
+          CAR_TO_PARK,
+          FLEXIBLE,
+          DEMAND_RESPONSIVE_TRANSPORTATION,
+          NOT_SET -> stateDatas;
         case CAR_PICKUP, CAR_HAILING -> stateDatas
           .stream()
           .filter(d -> d.carPickupState == CarPickupState.IN_CAR)
@@ -210,6 +224,7 @@ public class StateData implements Cloneable {
         CAR_TO_PARK,
         CAR_PICKUP,
         CAR_HAILING,
+        DEMAND_RESPONSIVE_TRANSPORTATION,
         FLEXIBLE -> throw new IllegalStateException(
         "Cannot convert street mode %s to a form factor".formatted(streetMode)
       );

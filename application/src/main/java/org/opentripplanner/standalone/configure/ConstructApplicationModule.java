@@ -7,6 +7,7 @@ import io.micrometer.core.instrument.Metrics;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.opentripplanner.astar.spi.TraverseVisitor;
+import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationService;
 import org.opentripplanner.ext.emissions.EmissionsService;
 import org.opentripplanner.ext.geocoder.LuceneIndex;
 import org.opentripplanner.ext.interactivelauncher.api.LauncherRequestDecorator;
@@ -44,6 +45,7 @@ public class ConstructApplicationModule {
     VehicleRentalService vehicleRentalService,
     VehicleParkingService vehicleParkingService,
     List<RideHailingService> rideHailingServices,
+    List<DemandResponsiveTransportationService> demandResponsiveTransportationServices,
     ViaCoordinateTransferFactory viaTransferResolver,
     @Nullable StopConsolidationService stopConsolidationService,
     StreetLimitationParametersService streetLimitationParametersService,
@@ -68,6 +70,7 @@ public class ConstructApplicationModule {
       raptorConfig,
       realtimeVehicleService,
       rideHailingServices,
+      demandResponsiveTransportationServices,
       defaultRequest,
       streetLimitationParametersService,
       transitRoutingConfig,

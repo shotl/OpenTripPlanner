@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.MissingNode;
 import java.io.Serializable;
 import java.util.List;
-
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationServiceParameters;
 import org.opentripplanner.ext.flex.FlexParameters;
 import org.opentripplanner.ext.ridehailing.RideHailingServiceParameters;
@@ -75,7 +74,9 @@ public class RouterConfig implements Serializable {
     this.routingRequestDefaults.initMaxSearchWindow(transitConfig.maxSearchWindow());
     this.updatersParameters = new UpdatersConfig(root);
     this.rideHailingConfig = new RideHailingServicesConfig(root);
-    this.demandResponsiveTransportationConfig = new DemandResponsiveTransportationServicesConfig(root);
+    this.demandResponsiveTransportationConfig = new DemandResponsiveTransportationServicesConfig(
+      root
+    );
     this.vectorTileConfig = VectorTileConfig.mapVectorTilesParameters(root, "vectorTiles");
     this.flexConfig = new FlexConfig(root, "flex");
 
@@ -128,7 +129,9 @@ public class RouterConfig implements Serializable {
     return rideHailingConfig.rideHailingServiceParameters();
   }
 
-  public List<DemandResponsiveTransportationServiceParameters> demandResponsiveTransportationServiceParameters() {
+  public List<
+    DemandResponsiveTransportationServiceParameters
+  > demandResponsiveTransportationServiceParameters() {
     return demandResponsiveTransportationConfig.demandResponsiveTransportationServiceParameters();
   }
 

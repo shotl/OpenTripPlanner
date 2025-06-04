@@ -1,12 +1,24 @@
 package org.opentripplanner.ext.demandresponsivetransportation.service.shotl;
 
-import java.util.List;
-
-public record ShotlArrivalEstimateResponse(List<UberArrivalEstimate> times) {
-  public record UberArrivalEstimate(
-    String display_name,
-    int estimate,
-    String localized_display_name,
-    String product_id
-  ) {}
+public record ShotlArrivalEstimateResponse(
+  String id,
+  String user_id,
+  String type,
+  String status,
+  String code,
+  ShotlGeoLocation desired_pickup_location,
+  ShotlGeoLocation desired_dropoff_location,
+  ShotlScheduledGeoLocation scheduled_pickup_place,
+  ShotlScheduledGeoLocation scheduled_dropoff_place,
+  long desired_pickup_time,
+  Long desired_dropoff_time,
+  long user_expected_pickup_time,
+  long user_expected_dropoff_time,
+  long petition_time,
+  ShotlPassengers passengers,
+  String vehicle_id
+) {
+  public record ShotlGeoLocation(double latitude, double longitute) {}
+  public record ShotlScheduledGeoLocation(ShotlGeoLocation location, String name) {}
+  public record ShotlPassengers(int regular, int wheelchair) {}
 }

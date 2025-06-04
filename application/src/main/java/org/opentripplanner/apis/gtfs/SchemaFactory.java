@@ -22,6 +22,7 @@ import org.opentripplanner.apis.gtfs.datafetchers.CarParkImpl;
 import org.opentripplanner.apis.gtfs.datafetchers.ContactInfoImpl;
 import org.opentripplanner.apis.gtfs.datafetchers.CoordinatesImpl;
 import org.opentripplanner.apis.gtfs.datafetchers.CurrencyImpl;
+import org.opentripplanner.apis.gtfs.datafetchers.DRTEstimateImpl;
 import org.opentripplanner.apis.gtfs.datafetchers.DefaultFareProductImpl;
 import org.opentripplanner.apis.gtfs.datafetchers.DepartureRowImpl;
 import org.opentripplanner.apis.gtfs.datafetchers.EntranceImpl;
@@ -188,6 +189,7 @@ public class SchemaFactory {
         .type(typeWiring.build(StopRelationshipImpl.class))
         .type(typeWiring.build(OpeningHoursImpl.class))
         .type(typeWiring.build(RideHailingEstimateImpl.class))
+        .type(typeWiring.build(DRTEstimateImpl.class))
         .type(typeWiring.build(MoneyImpl.class))
         .type(typeWiring.build(CurrencyImpl.class))
         .type(typeWiring.build(FareProductUseImpl.class))

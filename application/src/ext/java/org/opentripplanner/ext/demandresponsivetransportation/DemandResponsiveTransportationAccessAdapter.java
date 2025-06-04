@@ -18,7 +18,10 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
     this.arrival = arrival;
   }
 
-  public DemandResponsiveTransportationAccessAdapter(DemandResponsiveTransportationAccessAdapter other, TimeAndCost penalty) {
+  public DemandResponsiveTransportationAccessAdapter(
+    DemandResponsiveTransportationAccessAdapter other,
+    TimeAndCost penalty
+  ) {
     super(other, penalty);
     this.arrival = other.arrival;
   }

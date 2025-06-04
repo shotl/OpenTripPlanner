@@ -1,10 +1,9 @@
 package org.opentripplanner.ext.demandresponsivetransportation;
 
-import java.util.List;
+import java.io.IOException;
+import java.time.Instant;
 import java.util.concurrent.ExecutionException;
-import org.opentripplanner.ext.ridehailing.model.ArrivalTime;
-import org.opentripplanner.ext.ridehailing.model.RideEstimate;
-import org.opentripplanner.ext.ridehailing.model.RideHailingProvider;
+import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
 
 /**
@@ -12,19 +11,16 @@ import org.opentripplanner.framework.geometry.WgsCoordinate;
  */
 public interface DemandResponsiveTransportationService {
   /**
-   * The provider of the service.
-   */
-  RideHailingProvider provider();
-
-  /**
    * Get the next arrivals for a specific location.
    */
-  List<ArrivalTime> arrivalTimes(WgsCoordinate coordinate, boolean wheelchairAccessible)
-    throws ExecutionException;
-
-  List<RideEstimate> rideEstimates(
-    WgsCoordinate start,
-    WgsCoordinate end,
-    boolean wheelchairAccessible
-  ) throws ExecutionException;
+  ShotlArrivalEstimateResponse arrivalTimes(
+    String areaId,
+    String userId,
+    String rideType,
+    WgsCoordinate fromCoordinate,
+    WgsCoordinate toCoordinate,
+    int regularPassengers,
+    int wheelchairPassengers,
+    Instant desiredPickupTime
+  ) throws ExecutionException, IOException;
 }

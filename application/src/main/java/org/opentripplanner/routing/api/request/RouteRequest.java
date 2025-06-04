@@ -80,6 +80,9 @@ public class RouteRequest implements Cloneable, Serializable {
 
   private Instant bookingTime;
 
+  @Nullable
+  private DemandResponsiveExtData demandResponsiveExtData;
+
   /* CONSTRUCTORS */
 
   /** Constructor for options; modes defaults to walk and transit */
@@ -139,6 +142,21 @@ public class RouteRequest implements Cloneable, Serializable {
 
   public void setWheelchair(boolean wheelchair) {
     this.wheelchair = wheelchair;
+  }
+
+  /**
+   * Extended data for demand responsive transportation requests.
+   * Contains user and area identification information.
+   */
+  @Nullable
+  public DemandResponsiveExtData demandResponsiveExtData() {
+    return demandResponsiveExtData;
+  }
+
+  public void setDemandResponsiveExtData(
+    @Nullable DemandResponsiveExtData demandResponsiveExtData
+  ) {
+    this.demandResponsiveExtData = demandResponsiveExtData;
   }
 
   /**

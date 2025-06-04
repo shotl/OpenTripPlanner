@@ -23,6 +23,7 @@ public class TransferModeMapper {
       case WALK,
         BIKE_RENTAL,
         CAR_HAILING,
+        DEMAND_RESPONSIVE_TRANSPORTATION,
         CAR_RENTAL,
         CAR_PICKUP,
         CAR_TO_PARK,

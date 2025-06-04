@@ -106,6 +106,9 @@ public class ItineraryListFilterChainBuilder {
   private ItineraryListFilter rideHailingDecorator;
 
   @Sandbox
+  private ItineraryListFilter demandResponsiveTransportationDecorator;
+
+  @Sandbox
   private ItineraryDecorator stopConsolidationDecorator;
 
   public ItineraryListFilterChainBuilder(SortOrder sortOrder) {
@@ -363,6 +366,13 @@ public class ItineraryListFilterChainBuilder {
     return this;
   }
 
+  public ItineraryListFilterChainBuilder withDemandResponsiveTransportationDecoratingFilter(
+    ItineraryListFilter decoratorFilter
+  ) {
+    this.demandResponsiveTransportationDecorator = decoratorFilter;
+    return this;
+  }
+
   public ItineraryListFilterChainBuilder withConsolidatedStopNamesDecorator(
     @Nullable ItineraryDecorator decorator
   ) {
@@ -530,6 +540,10 @@ public class ItineraryListFilterChainBuilder {
 
       if (rideHailingDecorator != null) {
         filters.add(rideHailingDecorator);
+      }
+
+      if (demandResponsiveTransportationDecorator != null) {
+        filters.add(demandResponsiveTransportationDecorator);
       }
 
       if (stopConsolidationDecorator != null) {

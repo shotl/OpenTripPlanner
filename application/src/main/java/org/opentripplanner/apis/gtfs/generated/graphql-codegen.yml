@@ -122,6 +122,10 @@ config:
     OpeningHours: org.opentripplanner.model.calendar.openinghours.OHCalendar#OHCalendar
     RideHailingEstimate: org.opentripplanner.ext.ridehailing.model.RideEstimate#RideEstimate
     RideHailingProvider: org.opentripplanner.apis.gtfs.model.RideHailingProvider#RideHailingProvider
+    DrtEstimate: org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse#ShotlArrivalEstimateResponse
+    ShotlGeoLocation: org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse#ShotlGeoLocation
+    ShotlScheduledGeoLocation: org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse#ShotlScheduledGeoLocation
+    ShotlPassengers: org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse#ShotlPassengers
     Currency: java.util.Currency#Currency
     Money: org.opentripplanner.transit.model.basic.Money#Money
     FareProductUse: org.opentripplanner.model.fare.FareProductUse#FareProductUse

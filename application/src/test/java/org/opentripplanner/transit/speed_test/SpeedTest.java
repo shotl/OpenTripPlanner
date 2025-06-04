@@ -118,6 +118,7 @@ public class SpeedTest {
       raptorConfig,
       TestServerContext.createRealtimeVehicleService(transitService),
       List.of(),
+      List.of(),
       config.request,
       TestServerContext.createStreetLimitationParametersService(),
       config.transitRoutingParams,

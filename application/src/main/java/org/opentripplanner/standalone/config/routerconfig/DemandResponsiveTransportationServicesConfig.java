@@ -1,6 +1,6 @@
 package org.opentripplanner.standalone.config.routerconfig;
 
-import static org.opentripplanner.standalone.config.framework.json.OtpVersion.V2_3;
+import static org.opentripplanner.standalone.config.framework.json.OtpVersion.V2_7;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
@@ -17,12 +17,14 @@ public class DemandResponsiveTransportationServicesConfig {
   public DemandResponsiveTransportationServicesConfig(NodeAdapter rootAdapter) {
     rootAdapter
       .of("demandResponsiveTransportationServices")
-      .since(V2_3)
-      .summary("Configuration for interfaces to external demand responsive transportation services like Shotl.")
+      .since(V2_7)
+      .summary(
+        "Configuration for interfaces to external demand responsive transportation services like Shotl."
+      )
       .asObjects(it -> {
         Type type = it
           .of("type")
-          .since(V2_3)
+          .since(V2_7)
           .summary("The type of the service.")
           .asEnum(Type.class);
         var config = type.parseConfig(it);
@@ -32,7 +34,9 @@ public class DemandResponsiveTransportationServicesConfig {
       });
   }
 
-  public List<DemandResponsiveTransportationServiceParameters> demandResponsiveTransportationServiceParameters() {
+  public List<
+    DemandResponsiveTransportationServiceParameters
+  > demandResponsiveTransportationServiceParameters() {
     return configList
       .values()
       .stream()

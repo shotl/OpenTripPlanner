@@ -61,6 +61,11 @@ public enum StreetMode implements DocumentedEnum<StreetMode> {
   CAR_HAILING(Feature.ACCESS, Feature.EGRESS, Feature.DRIVING, Feature.PICKUP),
 
   /**
+   * Using DRT bus app like Shotl.
+   */
+  DEMAND_RESPONSIVE_TRANSPORTATION(Feature.ACCESS, Feature.EGRESS, Feature.DRIVING, Feature.PICKUP),
+
+  /**
    * Encompasses all types of on-demand and flexible transportation.
    */
   FLEXIBLE(Feature.ACCESS, Feature.EGRESS, Feature.WALKING);
@@ -182,6 +187,11 @@ public enum StreetMode implements DocumentedEnum<StreetMode> {
       Using a car hailing app like Uber or Lyft to get to a train station or all the way to the destination.
 
       See [the sandbox documentation](sandbox/RideHailing.md) on how to configure it.
+      """;
+      case DEMAND_RESPONSIVE_TRANSPORTATION -> """
+      Using DRT bus app like Shotl to get to a train station or all the way to the destination.
+
+      See [the sandbox documentation](sandbox/DemandResponsiveTransportation.md) on how to configure it.
       """;
       case FLEXIBLE -> "Encompasses all types of on-demand and flexible transportation for example GTFS Flex or NeTEx Flexible Stop Places.";
     };

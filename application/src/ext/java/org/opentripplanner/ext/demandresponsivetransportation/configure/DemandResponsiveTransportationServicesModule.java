@@ -4,7 +4,6 @@ import dagger.Module;
 import dagger.Provides;
 import jakarta.inject.Singleton;
 import java.util.List;
-
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationService;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlService;
 import org.opentripplanner.standalone.config.RouterConfig;
