@@ -245,6 +245,13 @@
             userId
             type
             status
+            userExpectedPickupTime
+            userExpectedDropoffTime
+            passengers {
+              regular
+              wheelchair
+            }
+            vehicleId
           }
           accessibilityScore
           id
