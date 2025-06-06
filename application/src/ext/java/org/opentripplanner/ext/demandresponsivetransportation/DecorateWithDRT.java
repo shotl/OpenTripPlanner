@@ -80,7 +80,7 @@ public class DecorateWithDRT implements ItineraryListFilter {
           request.demandResponsiveExtData().passengers().wheelchair(),
           leg.getStartTime().toInstant()
         );
-        if (drtEstimationResponse == null || drtEstimationResponse.shotlQuotedRide() == null) {
+        if (drtEstimationResponse == null) {
           LOG.warn("No DRT estimate available for leg: {}", leg);
           flagForDeletion(i);
           return leg;

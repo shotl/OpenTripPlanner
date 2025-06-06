@@ -10,11 +10,11 @@ public record ShotlArrivalEstimateResponse(
   ShotlGeoLocation desired_dropoff_location,
   ShotlScheduledGeoLocation scheduled_pickup_place,
   ShotlScheduledGeoLocation scheduled_dropoff_place,
-  long desired_pickup_time,
+  Long desired_pickup_time,
   Long desired_dropoff_time,
-  long user_expected_pickup_time,
-  long user_expected_dropoff_time,
-  long petition_time,
+  Long user_expected_pickup_time,
+  Long user_expected_dropoff_time,
+  Long petition_time,
   ShotlPassengers passengers,
   String vehicle_id
 ) {

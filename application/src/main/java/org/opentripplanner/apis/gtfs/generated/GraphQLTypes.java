@@ -2307,6 +2307,7 @@ public class GraphQLTypes {
     DROPOFF,
     EGRESS,
     HAIL,
+    DRT,
     HAVE,
     KEEP,
     PARK,

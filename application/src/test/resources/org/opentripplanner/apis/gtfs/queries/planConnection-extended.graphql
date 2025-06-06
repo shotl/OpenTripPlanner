@@ -241,8 +241,10 @@
             arrival
           }
           drtEstimate {
-            rideId
-            arrival
+            id
+            userId
+            type
+            status
           }
           accessibilityScore
           id

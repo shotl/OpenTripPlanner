@@ -25,6 +25,9 @@ import org.opentripplanner.apis.gtfs.generated.GraphQLTypes.GraphQLRoutingErrorC
 import org.opentripplanner.apis.gtfs.generated.GraphQLTypes.GraphQLTransitMode;
 import org.opentripplanner.apis.gtfs.model.CallRealTime;
 import org.opentripplanner.apis.gtfs.model.CallSchedule;
+import org.opentripplanner.apis.gtfs.model.DRTGeoLocation;
+import org.opentripplanner.apis.gtfs.model.DRTPassengers;
+import org.opentripplanner.apis.gtfs.model.DRTScheduledGeoLocation;
 import org.opentripplanner.apis.gtfs.model.FeedPublisher;
 import org.opentripplanner.apis.gtfs.model.PlanPageInfo;
 import org.opentripplanner.apis.gtfs.model.RideHailingProvider;
@@ -982,6 +985,62 @@ public class GraphQLDataFetchers {
 
   public interface GraphQLRideHailingProvider {
     public DataFetcher<String> id();
+  }
+
+  /** Response type for a Shotl arrival estimate, containing details of a quoted ride. */
+  public interface GraphQLDrtEstimate {
+    public DataFetcher<String> id();
+
+    public DataFetcher<String> userId();
+
+    public DataFetcher<String> type();
+
+    public DataFetcher<String> status();
+
+    public DataFetcher<String> code();
+
+    public DataFetcher<DRTGeoLocation> desiredPickupLocation();
+
+    public DataFetcher<DRTGeoLocation> desiredDropoffLocation();
+
+    public DataFetcher<DRTScheduledGeoLocation> scheduledPickupPlace();
+
+    public DataFetcher<DRTScheduledGeoLocation> scheduledDropoffPlace();
+
+    public DataFetcher<Long> desiredPickupTime();
+
+    public DataFetcher<Long> desiredDropoffTime();
+
+    public DataFetcher<Long> userExpectedPickupTime();
+
+    public DataFetcher<Long> userExpectedDropoffTime();
+
+    public DataFetcher<Long> petitionTime();
+
+    public DataFetcher<DRTPassengers> passengers();
+
+    public DataFetcher<String> vehicleId();
+  }
+
+  /** Represents passenger counts for a Shotl ride. */
+  public interface GraphQLShotlPassengers {
+    public DataFetcher<Integer> regular();
+
+    public DataFetcher<Integer> wheelchair();
+  }
+
+  /** Represents a geographic location for Shotl services. */
+  public interface GraphQLShotlGeoLocation {
+    public DataFetcher<Double> latitude();
+
+    public DataFetcher<Double> longitude();
+  }
+
+  /** Represents a scheduled geographic location for Shotl services, including a name. */
+  public interface GraphQLShotlScheduledGeoLocation {
+    public DataFetcher<GraphQLShotlGeoLocation> location();
+
+    public DataFetcher<String> name();
   }
 
   /** Category of riders a fare product applies to, for example students or pensioners. */
