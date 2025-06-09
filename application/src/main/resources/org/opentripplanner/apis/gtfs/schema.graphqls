@@ -1719,6 +1719,8 @@ type QueryType {
     dateTime: PlanDateTimeInput,
     "The destination where the search ends. Usually coordinates but can also be a stop location."
     destination: PlanLabeledLocationInput!,
+    "DRT (Demand Responsive Transport) configuration for the trip planning request."
+    drt: DRTInput,
     """
     How many new itineraries should at maximum be returned in either the first search or with
     forward pagination. This parameter is part of the
@@ -4088,6 +4090,26 @@ input CyclingOptimizationInput @oneOf {
   triangle: TriangleCyclingFactorsInput
   "Use one of the predefined optimization types."
   type: CyclingOptimizationType
+}
+
+"Input for DRT (Demand Responsive Transport) ride request."
+input DRTInput {
+  "Area ID for the DRT service."
+  areaId: String
+  "Passenger information for the DRT ride."
+  passengers: DRTPassengersInput
+  "Type of ride requested."
+  rideType: String
+  "User ID for the DRT service."
+  userId: String
+}
+
+"Input for DRT (Demand Responsive Transport) passenger information."
+input DRTPassengersInput {
+  "Number of regular passengers."
+  regular: Int
+  "Number of wheelchair passengers."
+  wheelchair: Int
 }
 
 """
