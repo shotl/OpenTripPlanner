@@ -2972,6 +2972,86 @@ public class GraphQLTypes {
     }
   }
 
+  public static class GraphQLDRTPassengersInput {
+
+    private Integer regular;
+    private Integer wheelchair;
+
+    public GraphQLDRTPassengersInput(Map<String, Object> args) {
+      if (args != null) {
+        this.regular = (Integer) args.get("regular");
+        this.wheelchair = (Integer) args.get("wheelchair");
+      }
+    }
+
+    public Integer getGraphQLRegular() {
+      return this.regular;
+    }
+
+    public Integer getGraphQLWheelchair() {
+      return this.wheelchair;
+    }
+
+    public void setGraphQLRegular(Integer regular) {
+      this.regular = regular;
+    }
+
+    public void setGraphQLWheelchair(Integer wheelchair) {
+      this.wheelchair = wheelchair;
+    }
+  }
+
+  public static class GraphQLDRTInput {
+
+    private String userId;
+    private String areaId;
+    private String rideType;
+    private GraphQLDRTPassengersInput passengers;
+
+    public GraphQLDRTInput(Map<String, Object> args) {
+      if (args != null) {
+        this.userId = (String) args.get("userId");
+        this.areaId = (String) args.get("areaId");
+        this.rideType = (String) args.get("rideType");
+        this.passengers = new GraphQLDRTPassengersInput(
+          (Map<String, Object>) args.get("passengers")
+        );
+      }
+    }
+
+    public String getGraphQLUserId() {
+      return this.userId;
+    }
+
+    public String getGraphQLAreaId() {
+      return this.areaId;
+    }
+
+    public String getGraphQLRideType() {
+      return this.rideType;
+    }
+
+    public GraphQLDRTPassengersInput getGraphQLPassengers() {
+      return this.passengers;
+    }
+
+    public void setGraphQLUserId(String userId) {
+      this.userId = userId;
+    }
+
+    public void setGraphQLAreaId(String areaId) {
+      this.areaId = areaId;
+    }
+
+    public void setGraphQLRideType(String rideType) {
+      this.rideType = rideType;
+    }
+
+    public void setGraphQLPassengers(GraphQLDRTPassengersInput passengers) {
+      this.passengers = passengers;
+    }
+  }
+
   public static class GraphQLQueryTypePlanArgs {
 
     private Integer alightSlack;
@@ -3038,6 +3118,8 @@ public class GraphQLTypes {
     private Double walkSafetyFactor;
     private Double walkSpeed;
     private Boolean wheelchair;
+
+    private GraphQLDRTInput drtInput;
 
     public GraphQLQueryTypePlanArgs(Map<String, Object> args) {
       if (args != null) {
@@ -3129,6 +3211,10 @@ public class GraphQLTypes {
         this.walkSafetyFactor = (Double) args.get("walkSafetyFactor");
         this.walkSpeed = (Double) args.get("walkSpeed");
         this.wheelchair = (Boolean) args.get("wheelchair");
+
+        if (args.get("drt") != null) {
+          this.drtInput = new GraphQLDRTInput((Map<String, Object>) args.get("drt"));
+        }
       }
     }
 
@@ -3649,6 +3735,14 @@ public class GraphQLTypes {
     public void setGraphQLWheelchair(Boolean wheelchair) {
       this.wheelchair = wheelchair;
     }
+
+    public GraphQLDRTInput getGraphQLDrtInput() {
+      return this.drtInput;
+    }
+
+    public void setGraphQLDrtInput(GraphQLDRTInput drtInput) {
+      this.drtInput = drtInput;
+    }
   }
 
   public static class GraphQLQueryTypePlanConnectionArgs {
@@ -3666,6 +3760,8 @@ public class GraphQLTypes {
     private GraphQLPlanPreferencesInput preferences;
     private java.time.Duration searchWindow;
     private List<GraphQLPlanViaLocationInput> via;
+
+    private GraphQLDRTInput drtInput;
 
     public GraphQLQueryTypePlanConnectionArgs(Map<String, Object> args) {
       if (args != null) {
@@ -3689,6 +3785,10 @@ public class GraphQLTypes {
         this.searchWindow = (java.time.Duration) args.get("searchWindow");
         if (args.get("via") != null) {
           this.via = (List<GraphQLPlanViaLocationInput>) args.get("via");
+        }
+
+        if (args.get("drt") != null) {
+          this.drtInput = new GraphQLDRTInput((Map<String, Object>) args.get("drt"));
         }
       }
     }
@@ -3795,6 +3895,14 @@ public class GraphQLTypes {
 
     public void setGraphQLVia(List<GraphQLPlanViaLocationInput> via) {
       this.via = via;
+    }
+
+    public GraphQLDRTInput getGraphQLDrtInput() {
+      return this.drtInput;
+    }
+
+    public void setGraphQLDrtInput(GraphQLDRTInput drtInput) {
+      this.drtInput = drtInput;
     }
   }
 

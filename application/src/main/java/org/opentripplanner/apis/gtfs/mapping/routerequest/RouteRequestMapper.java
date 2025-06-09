@@ -15,6 +15,8 @@ import org.opentripplanner.apis.gtfs.GraphQLRequestContext;
 import org.opentripplanner.apis.gtfs.generated.GraphQLTypes;
 import org.opentripplanner.framework.graphql.GraphQLUtils;
 import org.opentripplanner.model.GenericLocation;
+import org.opentripplanner.routing.api.request.DemandResponsiveExtData;
+import org.opentripplanner.routing.api.request.Passengers;
 import org.opentripplanner.routing.api.request.RouteRequest;
 import org.opentripplanner.routing.api.request.preference.ItineraryFilterPreferences;
 import org.opentripplanner.routing.api.request.preference.RoutingPreferences;
@@ -67,6 +69,9 @@ public class RouteRequestMapper {
 
     // sadly we need to use the raw collection because it is cast to the wrong type
     mapViaPoints(request, environment.getArgument("via"));
+
+    setDrtInput(request, args.getGraphQLDrtInput());
+
     return request;
   }
 
@@ -185,5 +190,21 @@ public class RouteRequestMapper {
 
   static void mapViaPoints(RouteRequest request, List<Map<String, Map<String, Object>>> via) {
     request.setViaLocations(ViaLocationMapper.mapToViaLocations(via));
+  }
+
+  private static void setDrtInput(RouteRequest request, GraphQLTypes.GraphQLDRTInput drtInput) {
+    if (drtInput != null) {
+      request.setDemandResponsiveExtData(
+        new DemandResponsiveExtData(
+          drtInput.getGraphQLUserId(),
+          drtInput.getGraphQLAreaId(),
+          drtInput.getGraphQLRideType(),
+          new Passengers(
+            drtInput.getGraphQLPassengers().getGraphQLRegular(),
+            drtInput.getGraphQLPassengers().getGraphQLWheelchair()
+          )
+        )
+      );
+    }
   }
 }
