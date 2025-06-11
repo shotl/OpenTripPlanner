@@ -127,7 +127,11 @@ public class DemandResponsiveTransportationAccessShifter {
 
     try {
       var service = services.get(0);
+
+      LOG.info("shifting access for DRT");
+
       var drtEstimationResponse = service.arrivalTimes(
+        req.demandResponsiveExtData().paxAppId(),
         req.demandResponsiveExtData().areaId(),
         req.demandResponsiveExtData().userId(),
         req.demandResponsiveExtData().rideType(),

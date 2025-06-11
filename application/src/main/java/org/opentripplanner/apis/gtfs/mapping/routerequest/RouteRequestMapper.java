@@ -196,6 +196,7 @@ public class RouteRequestMapper {
     if (drtInput != null) {
       request.setDemandResponsiveExtData(
         new DemandResponsiveExtData(
+          drtInput.getGraphQLPaxAppId(),
           drtInput.getGraphQLUserId(),
           drtInput.getGraphQLAreaId(),
           drtInput.getGraphQLRideType(),

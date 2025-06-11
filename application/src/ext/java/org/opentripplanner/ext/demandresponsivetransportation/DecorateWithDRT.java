@@ -70,7 +70,10 @@ public class DecorateWithDRT implements ItineraryListFilter {
   ) {
     try {
       if (leg instanceof StreetLeg sl && sl.getMode().isInCar()) {
+        LOG.info("decorating leg with DRT estimate");
+
         var drtEstimationResponse = service.arrivalTimes(
+          request.demandResponsiveExtData().paxAppId(),
           request.demandResponsiveExtData().areaId(),
           request.demandResponsiveExtData().userId(),
           request.demandResponsiveExtData().rideType(),

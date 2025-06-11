@@ -41,7 +41,7 @@ public class DRTEstimateImpl implements GraphQLDataFetchers.GraphQLDrtEstimate {
       ShotlArrivalEstimateResponse.ShotlGeoLocation location = getSource(
         env
       ).desired_pickup_location();
-      return new DRTGeoLocation(location.latitude(), location.longitute());
+      return new DRTGeoLocation(location.latitude(), location.longitude());
     };
   }
 
@@ -51,7 +51,7 @@ public class DRTEstimateImpl implements GraphQLDataFetchers.GraphQLDrtEstimate {
       ShotlArrivalEstimateResponse.ShotlGeoLocation location = getSource(
         env
       ).desired_dropoff_location();
-      return new DRTGeoLocation(location.latitude(), location.longitute());
+      return new DRTGeoLocation(location.latitude(), location.longitude());
     };
   }
 
@@ -66,7 +66,7 @@ public class DRTEstimateImpl implements GraphQLDataFetchers.GraphQLDrtEstimate {
       }
       ShotlArrivalEstimateResponse.ShotlGeoLocation location = scheduledPlace.location();
       return new DRTScheduledGeoLocation(
-        new DRTGeoLocation(location.latitude(), location.longitute()),
+        new DRTGeoLocation(location.latitude(), location.longitude()),
         scheduledPlace.name()
       );
     };
@@ -83,7 +83,7 @@ public class DRTEstimateImpl implements GraphQLDataFetchers.GraphQLDrtEstimate {
       }
       ShotlArrivalEstimateResponse.ShotlGeoLocation location = scheduledPlace.location();
       return new DRTScheduledGeoLocation(
-        new DRTGeoLocation(location.latitude(), location.longitute()),
+        new DRTGeoLocation(location.latitude(), location.longitude()),
         scheduledPlace.name()
       );
     };

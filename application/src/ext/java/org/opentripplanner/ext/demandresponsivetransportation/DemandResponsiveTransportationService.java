@@ -14,6 +14,7 @@ public interface DemandResponsiveTransportationService {
    * Get the next arrivals for a specific location.
    */
   ShotlArrivalEstimateResponse arrivalTimes(
+    String paxAppId,
     String areaId,
     String userId,
     String rideType,

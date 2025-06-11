@@ -4098,6 +4098,8 @@ input DRTInput {
   areaId: String
   "Passenger information for the DRT ride."
   passengers: DRTPassengersInput
+  "passenger app id"
+  paxAppId: String
   "Type of ride requested."
   rideType: String
   "User ID for the DRT service."

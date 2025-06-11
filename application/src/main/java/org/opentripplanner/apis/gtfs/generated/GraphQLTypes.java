@@ -3003,6 +3003,7 @@ public class GraphQLTypes {
 
   public static class GraphQLDRTInput {
 
+    private String paxAppId;
     private String userId;
     private String areaId;
     private String rideType;
@@ -3010,6 +3011,7 @@ public class GraphQLTypes {
 
     public GraphQLDRTInput(Map<String, Object> args) {
       if (args != null) {
+        this.paxAppId = (String) args.get("paxAppId");
         this.userId = (String) args.get("userId");
         this.areaId = (String) args.get("areaId");
         this.rideType = (String) args.get("rideType");
@@ -3017,6 +3019,10 @@ public class GraphQLTypes {
           (Map<String, Object>) args.get("passengers")
         );
       }
+    }
+
+    public String getGraphQLPaxAppId() {
+      return this.paxAppId;
     }
 
     public String getGraphQLUserId() {
@@ -3037,6 +3043,10 @@ public class GraphQLTypes {
 
     public void setGraphQLUserId(String userId) {
       this.userId = userId;
+    }
+
+    public void setGraphQLPaxAppId(String paxAppId) {
+      this.paxAppId = paxAppId;
     }
 
     public void setGraphQLAreaId(String areaId) {

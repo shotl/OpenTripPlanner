@@ -26,8 +26,7 @@ import org.slf4j.LoggerFactory;
 public class ShotlService implements DemandResponsiveTransportationService {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShotlService.class);
-  private static final String DEFAULT_BASE_URL = "http://rides.shotl.aws/";
-  private static final String DEFAULT_TIME_ESTIMATE_URI = DEFAULT_BASE_URL + "drt/time-estimations";
+  private static final String DEFAULT_TIME_ESTIMATE_PATH = "drt/time-estimations";
   private static final ObjectMapper MAPPER = ObjectMappers.ignoringExtraFields();
 
   private final String timeEstimateUri;
@@ -35,15 +34,17 @@ public class ShotlService implements DemandResponsiveTransportationService {
   private final OtpHttpClient otpHttpClient;
 
   public ShotlService(DemandResponsiveTransportationServiceParameters config) {
-    this(DEFAULT_TIME_ESTIMATE_URI);
+    this(config.estimationsURL(), DEFAULT_TIME_ESTIMATE_PATH);
   }
 
-  ShotlService(String timeEstimateUri) {
-    this.timeEstimateUri = timeEstimateUri;
+  ShotlService(String baseUrl, String timeEstimateUri) {
+    this.timeEstimateUri = baseUrl + timeEstimateUri;
+
     this.otpHttpClient = new OtpHttpClientFactory().create(LOG);
   }
 
   public ShotlArrivalEstimateResponse arrivalTimes(
+    String paxAppId,
     String areaId,
     String userId,
     String rideType,
@@ -91,7 +92,7 @@ public class ShotlService implements DemandResponsiveTransportationService {
       uri,
       jsonBody,
       Duration.ofSeconds(60),
-      headers(),
+      headers(paxAppId),
       is -> {
         try {
           return MAPPER.readValue(is, ShotlArrivalEstimateResponse.class);
@@ -101,12 +102,16 @@ public class ShotlService implements DemandResponsiveTransportationService {
       }
     );
 
-    LOG.debug("Received {} Shotl arrival time estimates", response);
+    LOG.info("Received {} Shotl arrival time estimates", response);
 
     return response;
   }
 
-  private Map<String, String> headers() throws IOException {
-    return Map.ofEntries(entry(ACCEPT_LANGUAGE, "en_US"), entry(CONTENT_TYPE, "application/json"));
+  private Map<String, String> headers(String paxAppId) throws IOException {
+    return Map.ofEntries(
+      entry(ACCEPT_LANGUAGE, "en_US"),
+      entry(CONTENT_TYPE, "application/json"),
+      entry("Shotl-Passenger-App-Id", paxAppId)
+    );
   }
 }

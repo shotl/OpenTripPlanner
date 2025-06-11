@@ -11,6 +11,9 @@ import javax.annotation.Nullable;
 public class DemandResponsiveExtData implements Serializable {
 
   @Nullable
+  private final String paxAppId;
+
+  @Nullable
   private final String userId;
 
   @Nullable
@@ -23,15 +26,25 @@ public class DemandResponsiveExtData implements Serializable {
   private final Passengers passengers;
 
   public DemandResponsiveExtData(
+    @Nullable String paxAppId,
     @Nullable String userId,
     @Nullable String areaId,
     @Nullable String rideType,
     @Nullable Passengers passengers
   ) {
+    this.paxAppId = paxAppId;
     this.userId = userId;
     this.areaId = areaId;
     this.rideType = rideType;
     this.passengers = passengers;
+  }
+
+  /**
+   * PaxApp identifier for demand responsive transportation
+   */
+  @Nullable
+  public String paxAppId() {
+    return paxAppId;
   }
 
   /**
@@ -72,6 +85,7 @@ public class DemandResponsiveExtData implements Serializable {
     if (o == null || getClass() != o.getClass()) return false;
     DemandResponsiveExtData that = (DemandResponsiveExtData) o;
     return (
+      Objects.equals(paxAppId, that.paxAppId) &&
       Objects.equals(userId, that.userId) &&
       Objects.equals(areaId, that.areaId) &&
       Objects.equals(rideType, that.rideType) &&
@@ -81,13 +95,16 @@ public class DemandResponsiveExtData implements Serializable {
 
   @Override
   public int hashCode() {
-    return Objects.hash(userId, areaId, rideType, passengers);
+    return Objects.hash(paxAppId, userId, areaId, rideType, passengers);
   }
 
   @Override
   public String toString() {
     return (
       "DemandResponsiveExtData{" +
+      "paxAppId='" +
+      paxAppId +
+      '\'' +
       "userId='" +
       userId +
       '\'' +
@@ -108,10 +125,16 @@ public class DemandResponsiveExtData implements Serializable {
    */
   public static class Builder {
 
+    private String paxAppId;
     private String userId;
     private String areaId;
     private String rideType;
     private Passengers passengers;
+
+    public Builder paxAppId(String paxAppId) {
+      this.paxAppId = paxAppId;
+      return this;
+    }
 
     public Builder userId(String userId) {
       this.userId = userId;
@@ -134,7 +157,7 @@ public class DemandResponsiveExtData implements Serializable {
     }
 
     public DemandResponsiveExtData build() {
-      return new DemandResponsiveExtData(userId, areaId, rideType, passengers);
+      return new DemandResponsiveExtData(paxAppId, userId, areaId, rideType, passengers);
     }
   }
 

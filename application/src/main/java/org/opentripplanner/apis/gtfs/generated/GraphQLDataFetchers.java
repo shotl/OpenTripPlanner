@@ -33,6 +33,7 @@ import org.opentripplanner.apis.gtfs.model.PlanPageInfo;
 import org.opentripplanner.apis.gtfs.model.RideHailingProvider;
 import org.opentripplanner.apis.gtfs.model.StopPosition;
 import org.opentripplanner.apis.gtfs.model.TripOccupancy;
+import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.ext.fares.model.FareRuleSet;
 import org.opentripplanner.ext.ridehailing.model.RideEstimate;
 import org.opentripplanner.model.StopTimesInPattern;
@@ -571,6 +572,8 @@ public class GraphQLDataFetchers {
     public DataFetcher<Boolean> rentedBike();
 
     public DataFetcher<RideEstimate> rideHailingEstimate();
+
+    public DataFetcher<ShotlArrivalEstimateResponse> drtEstimate();
 
     public DataFetcher<Route> route();
 

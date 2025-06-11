@@ -18,7 +18,7 @@ public record ShotlArrivalEstimateResponse(
   ShotlPassengers passengers,
   String vehicle_id
 ) {
-  public record ShotlGeoLocation(double latitude, double longitute) {}
+  public record ShotlGeoLocation(double latitude, double longitude) {}
   public record ShotlScheduledGeoLocation(ShotlGeoLocation location, String name) {}
   public record ShotlPassengers(int regular, int wheelchair) {}
 }
