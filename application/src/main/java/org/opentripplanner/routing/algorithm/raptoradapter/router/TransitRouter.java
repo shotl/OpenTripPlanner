@@ -327,7 +327,7 @@ public class TransitRouter {
       return accessEgressList;
     }
 
-    if (streetRequest.mode() != StreetMode.CAR_HAILING) {
+    if (streetRequest.mode() == StreetMode.CAR_HAILING) {
       return RideHailingAccessShifter.shiftAccesses(
         type.isAccess(),
         accessEgressList,
