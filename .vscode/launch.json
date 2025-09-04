@@ -1,0 +1,78 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Debug OTP Load Test Data",
+            "request": "launch",
+            "mainClass": "org.opentripplanner.standalone.OTPMain",
+            "projectName": "application",
+            "args": ["--load", "./test_data"],
+            "vmArgs": [
+                "-Xmx4G",
+                "-Dfile.encoding=UTF-8"
+            ],
+            "console": "integratedTerminal",
+            "env": {},
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "java",
+            "name": "Debug OTP Main",
+            "request": "launch",
+            "mainClass": "org.opentripplanner.standalone.OTPMain",
+            "projectName": "application",
+            "args": [],
+            "vmArgs": [],
+            "console": "integratedTerminal",
+            "env": {},
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "java",
+            "name": "Debug OTP Server",
+            "request": "launch",
+            "mainClass": "org.opentripplanner.standalone.OTPMain",
+            "projectName": "application",
+            "args": ["--serve", "--port", "8080"],
+            "vmArgs": [
+                "-Xmx4G",
+                "-Dfile.encoding=UTF-8"
+            ],
+            "console": "integratedTerminal",
+            "env": {},
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "java",
+            "name": "Debug OTP Build Graph",
+            "request": "launch",
+            "mainClass": "org.opentripplanner.standalone.OTPMain",
+            "projectName": "application",
+            "args": ["--build", "--save"],
+            "vmArgs": [
+                "-Xmx8G",
+                "-Dfile.encoding=UTF-8"
+            ],
+            "console": "integratedTerminal",
+            "env": {},
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "java",
+            "name": "Debug OTP with Custom Config",
+            "request": "launch",
+            "mainClass": "org.opentripplanner.standalone.OTPMain",
+            "projectName": "application",
+            "args": ["--serve", "--port", "8080", "--basePath", "${workspaceFolder}/test_data"],
+            "vmArgs": [
+                "-Xmx4G",
+                "-Dfile.encoding=UTF-8",
+                "-Dlogback.configurationFile=${workspaceFolder}/application/src/main/resources/logback.xml"
+            ],
+            "console": "integratedTerminal",
+            "env": {},
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

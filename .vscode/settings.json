@@ -1,0 +1,12 @@
+{
+    "java.debug.settings.onBuildFailureProceed": true,
+    "java.jdt.ls.java.home": "/Users/abel/.sdkman/candidates/java/21.0.7-tem",
+    "java.configuration.runtimes": [
+        {
+            "name": "JavaSE-21",
+            "path": "/Users/abel/.sdkman/candidates/java/21.0.7-tem",
+            "default": true
+        }
+    ],
+    "maven.java.home": "/Users/abel/.sdkman/candidates/java/21.0.7-tem"
+}

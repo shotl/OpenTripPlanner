@@ -431,6 +431,42 @@ type Currency {
   digits: Int!
 }
 
+"Response type for a Shotl arrival estimate, containing details of a quoted ride."
+type DRTEstimate {
+  "A code associated with the ride."
+  code: String!
+  "Desired dropoff location for the ride."
+  desiredDropoffLocation: ShotlGeoLocation!
+  "Desired dropoff time as epoch seconds (nullable)."
+  desiredDropoffTime: Long
+  "Desired pickup location for the ride."
+  desiredPickupLocation: ShotlGeoLocation!
+  "Desired pickup time as epoch seconds."
+  desiredPickupTime: Long!
+  "Unique identifier for the quoted ride."
+  id: String!
+  "Passenger details for the ride."
+  passengers: ShotlPassengers!
+  "Petition time for the ride as epoch seconds."
+  petitionTime: Long!
+  "Scheduled dropoff place, including location and name."
+  scheduledDropoffPlace: ShotlScheduledGeoLocation!
+  "Scheduled pickup place, including location and name."
+  scheduledPickupPlace: ShotlScheduledGeoLocation!
+  "Current status of the ride."
+  status: String!
+  "Type of the ride."
+  type: String!
+  "User expected dropoff time as epoch seconds."
+  userExpectedDropoffTime: Long!
+  "User expected pickup time as epoch seconds."
+  userExpectedPickupTime: Long!
+  "Identifier for the user."
+  userId: String!
+  "Identifier for the vehicle assigned to the ride (nullable)."
+  vehicleId: String
+}
+
 """
 The standard case of a fare product: it only has a single price to be paid by the passenger
 and no discounts are applied.
@@ -717,6 +753,8 @@ type Leg {
   dropOffBookingInfo: BookingInfo
   "This is used to indicate if alighting from this leg is possible only with special arrangements."
   dropoffType: PickupDropoffType
+  "Estimate of a DRT ride like Shotl."
+  drtEstimate: DRTEstimate
   "The leg's duration in seconds"
   duration: Float
   "The time when the leg ends including real-time information, if available."
@@ -1428,6 +1466,8 @@ type QueryType {
     implemented for the long distance path service.
     """
     disableRemainingWeightHeuristic: Boolean @deprecated(reason : "Removed in OTP 2.2"),
+    "DRT (Demand Responsive Transport) configuration for the trip planning request."
+    drt: DRTInput,
     """
     The geographical location where the itinerary begins.
     Use either this argument or `fromPlace`, but not both.
@@ -1681,6 +1721,8 @@ type QueryType {
     dateTime: PlanDateTimeInput,
     "The destination where the search ends. Usually coordinates but can also be a stop location."
     destination: PlanLabeledLocationInput!,
+    "DRT (Demand Responsive Transport) configuration for the trip planning request."
+    drt: DRTInput,
     """
     How many new itineraries should at maximum be returned in either the first search or with
     forward pagination. This parameter is part of the
@@ -2088,6 +2130,30 @@ type RoutingError {
   description: String!
   "An enum describing the field which should be changed, in order for the search to succeed"
   inputField: InputField
+}
+
+"Represents a geographic location for Shotl services."
+type ShotlGeoLocation {
+  "Latitude of the location."
+  latitude: Float!
+  "Longitude of the location."
+  longitude: Float!
+}
+
+"Represents passenger counts for a Shotl ride."
+type ShotlPassengers {
+  "Number of regular passengers."
+  regular: Int!
+  "Number of wheelchair passengers."
+  wheelchair: Int!
+}
+
+"Represents a scheduled geographic location for Shotl services, including a name."
+type ShotlScheduledGeoLocation {
+  "The geographic location."
+  location: ShotlGeoLocation!
+  "Name of the location (e.g., address or point of interest)."
+  name: String
 }
 
 """
@@ -3503,6 +3569,8 @@ enum Qualifier {
   DIRECT
   "The user can be dropped off by someone else riding a vehicle"
   DROPOFF
+  "Demand Responsive Transportation, for example via an app like Shotl"
+  DRT
   "The mode is used for the egress part of the search."
   EGRESS
   "Hailing a ride, for example via an app like Uber."
@@ -4026,6 +4094,28 @@ input CyclingOptimizationInput @oneOf {
   triangle: TriangleCyclingFactorsInput
   "Use one of the predefined optimization types."
   type: CyclingOptimizationType
+}
+
+"Input for DRT (Demand Responsive Transport) ride request."
+input DRTInput {
+  "Area ID for the DRT service."
+  areaId: String
+  "Passenger information for the DRT ride."
+  passengers: DRTPassengersInput
+  "passenger app id"
+  paxAppId: String
+  "Type of ride requested."
+  rideType: String
+  "User ID for the DRT service."
+  userId: String
+}
+
+"Input for DRT (Demand Responsive Transport) passenger information."
+input DRTPassengersInput {
+  "Number of regular passengers."
+  regular: Int
+  "Number of wheelchair passengers."
+  wheelchair: Int
 }
 
 """

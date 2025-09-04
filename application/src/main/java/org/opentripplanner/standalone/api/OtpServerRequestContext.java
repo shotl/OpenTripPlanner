@@ -7,6 +7,7 @@ import java.util.Locale;
 import javax.annotation.Nullable;
 import org.opentripplanner.astar.spi.TraverseVisitor;
 import org.opentripplanner.ext.dataoverlay.routing.DataOverlayContext;
+import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationService;
 import org.opentripplanner.ext.emissions.EmissionsService;
 import org.opentripplanner.ext.flex.FlexParameters;
 import org.opentripplanner.ext.geocoder.LuceneIndex;
@@ -108,6 +109,8 @@ public interface OtpServerRequestContext {
   RaptorTuningParameters raptorTuningParameters();
 
   List<RideHailingService> rideHailingServices();
+
+  List<DemandResponsiveTransportationService> demandResponsiveTransportationServices();
 
   StreetLimitationParametersService streetLimitationParametersService();
 

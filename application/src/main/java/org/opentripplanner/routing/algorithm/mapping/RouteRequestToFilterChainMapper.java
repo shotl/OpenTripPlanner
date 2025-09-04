@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.function.Consumer;
+import org.opentripplanner.ext.demandresponsivetransportation.DecorateWithDRT;
 import org.opentripplanner.ext.emissions.DecorateWithEmission;
 import org.opentripplanner.ext.fares.DecorateWithFare;
 import org.opentripplanner.ext.ridehailing.DecorateWithRideHailing;
@@ -107,6 +108,12 @@ public class RouteRequestToFilterChainMapper {
     if (!context.rideHailingServices().isEmpty()) {
       builder.withRideHailingDecoratingFilter(
         new DecorateWithRideHailing(context.rideHailingServices(), request.wheelchair())
+      );
+    }
+
+    if (!context.demandResponsiveTransportationServices().isEmpty()) {
+      builder.withDemandResponsiveTransportationDecoratingFilter(
+        new DecorateWithDRT(context.demandResponsiveTransportationServices(), request)
       );
     }
 

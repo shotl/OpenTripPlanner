@@ -20,6 +20,8 @@ import org.opentripplanner.apis.gtfs.generated.GraphQLTypes;
 import org.opentripplanner.framework.graphql.GraphQLUtils;
 import org.opentripplanner.framework.time.ZoneIdFallback;
 import org.opentripplanner.model.GenericLocation;
+import org.opentripplanner.routing.api.request.DemandResponsiveExtData;
+import org.opentripplanner.routing.api.request.Passengers;
 import org.opentripplanner.routing.api.request.RouteRequest;
 import org.opentripplanner.routing.api.request.framework.CostLinearFunction;
 import org.opentripplanner.routing.api.request.preference.ItineraryFilterDebugProfile;
@@ -241,6 +243,9 @@ public class LegacyRouteRequestMapper {
     callWith.argument("locale", (String v) ->
       request.setLocale(GraphQLUtils.getLocale(environment, v))
     );
+
+    setDrtInput(request, environment.getArgument("drt"));
+
     return request;
   }
 
@@ -324,6 +329,28 @@ public class LegacyRouteRequestMapper {
     callWith.argument("bikeSwitchCost", cost -> walking.withMountDismountCost((int) cost));
   }
 
+  @SuppressWarnings("unchecked")
+  private static void setDrtInput(RouteRequest request, Object drtInput) {
+    if (drtInput != null) {
+      Map<String, Object> drtMap = (Map<String, Object>) drtInput;
+
+      Map<String, Object> passengersMap = (Map<String, Object>) drtMap.get("passengers");
+
+      request.setDemandResponsiveExtData(
+        new DemandResponsiveExtData(
+          (String) drtMap.get("paxAppId"),
+          (String) drtMap.get("userId"),
+          (String) drtMap.get("areaId"),
+          (String) drtMap.get("rideType"),
+          new Passengers(
+            (Integer) passengersMap.get("regular"),
+            (Integer) passengersMap.get("wheelchair")
+          )
+        )
+      );
+    }
+  }
+
   private static class CallerWithEnvironment {
 
     private final DataFetchingEnvironment environment;
@@ -350,6 +377,7 @@ public class LegacyRouteRequestMapper {
       }
     }
 
+    @SuppressWarnings("unchecked")
     private static <T> void call(Map<String, T> m, String name, Consumer<T> consumer) {
       if (!name.contains(".")) {
         if (hasArgument(m, name)) {

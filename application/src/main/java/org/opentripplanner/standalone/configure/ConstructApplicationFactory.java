@@ -6,6 +6,7 @@ import graphql.schema.GraphQLSchema;
 import jakarta.inject.Singleton;
 import javax.annotation.Nullable;
 import org.opentripplanner.apis.gtfs.configure.SchemaModule;
+import org.opentripplanner.ext.demandresponsivetransportation.configure.DemandResponsiveTransportationServicesModule;
 import org.opentripplanner.ext.emissions.EmissionsDataModel;
 import org.opentripplanner.ext.emissions.EmissionsServiceModule;
 import org.opentripplanner.ext.geocoder.LuceneIndex;
@@ -64,6 +65,7 @@ import org.opentripplanner.visualizer.GraphVisualizer;
     RealtimeVehicleServiceModule.class,
     RealtimeVehicleRepositoryModule.class,
     RideHailingServicesModule.class,
+    DemandResponsiveTransportationServicesModule.class,
     SchemaModule.class,
     SorlandsbanenNorwayModule.class,
     StopConsolidationServiceModule.class,

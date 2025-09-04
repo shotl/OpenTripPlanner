@@ -67,6 +67,13 @@ This mode needs to be combined with at least one transit mode otherwise, it beha
 _Prerequisite:_ Park-and-ride areas near the stations need to be present in the OSM input file.
 
 
+<h4 id="DEMAND_RESPONSIVE_TRANSPORTATION">DEMAND_RESPONSIVE_TRANSPORTATION</h4>
+
+Using DRT bus app like Shotl to get to a train station or all the way to the destination.
+
+See [the sandbox documentation](sandbox/DemandResponsiveTransportation.md) on how to configure it.
+
+
 <h4 id="FLEXIBLE">FLEXIBLE</h4>
 
 Encompasses all types of on-demand and flexible transportation for example GTFS Flex or NeTEx Flexible Stop Places.

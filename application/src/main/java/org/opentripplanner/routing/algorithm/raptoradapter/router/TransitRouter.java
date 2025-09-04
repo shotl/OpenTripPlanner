@@ -13,6 +13,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.stream.IntStream;
 import javax.annotation.Nullable;
+import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationAccessShifter;
 import org.opentripplanner.ext.ridehailing.RideHailingAccessShifter;
 import org.opentripplanner.framework.application.OTPFeature;
 import org.opentripplanner.model.plan.Itinerary;
@@ -282,6 +283,7 @@ public class TransitRouter {
       stopCountLimit
     );
     var accessEgresses = AccessEgressMapper.mapNearbyStops(nearbyStops, type);
+
     accessEgresses = timeshiftRideHailing(streetRequest, type, accessEgresses);
 
     var results = new ArrayList<>(accessEgresses);
@@ -318,13 +320,27 @@ public class TransitRouter {
     AccessEgressType type,
     List<RoutingAccessEgress> accessEgressList
   ) {
-    if (streetRequest.mode() != StreetMode.CAR_HAILING) {
+    if (
+      streetRequest.mode() != StreetMode.CAR_HAILING &&
+      streetRequest.mode() != StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION
+    ) {
       return accessEgressList;
     }
-    return RideHailingAccessShifter.shiftAccesses(
+
+    if (streetRequest.mode() == StreetMode.CAR_HAILING) {
+      return RideHailingAccessShifter.shiftAccesses(
+        type.isAccess(),
+        accessEgressList,
+        serverContext.rideHailingServices(),
+        request,
+        Instant.now()
+      );
+    }
+
+    return DemandResponsiveTransportationAccessShifter.shiftAccesses(
       type.isAccess(),
       accessEgressList,
-      serverContext.rideHailingServices(),
+      serverContext.demandResponsiveTransportationServices(),
       request,
       Instant.now()
     );

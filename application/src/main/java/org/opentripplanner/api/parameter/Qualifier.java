@@ -29,4 +29,9 @@ public enum Qualifier {
    * Hailing a car from a taxi-like service like Uber or Lyft
    */
   HAIL,
+  /**
+   * Demand Responsive Transportation (DRT) service, which is a flexible transport service
+   * that can adapt to user demand and is often used in areas with low population density.
+   */
+  DRT,
 }
