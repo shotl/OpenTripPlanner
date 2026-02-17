@@ -1,0 +1,74 @@
+{{- $name := "otp" -}}
+app:
+  # Defines the default name for the image repository.
+  # If public access is enabled this name is used to form the FQDN.
+  name: {{ $name }}
+  componentName: server
+
+  image:
+    tag: "{{ .App.imageTag }}"
+
+  command: ["--max-memory", "4", "--config-files-path", "/app/config", "serve"]
+
+  replicas: 1
+
+  # Other pods in the same node might suffer when otp-server is starting
+  resources:
+    limits:
+      memory: 4096Mi
+    requests:
+      cpu: 250m
+      memory: 2048Mi
+
+  monitoring:
+    prometheus:
+      enabled: true
+      createPort: false
+      portName: http
+      path: /otp/actuators/prometheus
+      serviceMonitor:
+        enabled: true
+
+  startupProbe:
+    enabled: true
+    path: /otp/actuators/health
+
+  readinessProbe:
+    path: /otp/actuators/health
+
+  livenessProbe:
+    path: /otp/actuators/health
+
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::{{ .Environment.awsAccountID }}:role/{{ .Environment.clusterName | replace "_" "."}}.{{ $name }}.role"
+
+  rbac:
+    enabled: true
+    rules:
+      - apiGroups: ["apps", "extensions"]
+        resources: ["deployments"]
+        resourceNames: ["otp-server"]
+        verbs: ["get", "patch", "update"]
+
+  volumeMounts:
+    - name: build
+      mountPath: /build
+
+  volumes:
+    - name: build
+      emptyDir:
+        sizeLimit: 5Gi
+
+  environment:
+    ENV: "{{ .Environment.envName }}"
+    NEW_RELIC_APP_NAME: "{{ .App.Name }}-{{ .Environment.envShort }}"
+    NEW_RELIC_LABELS: "env:{{ .Environment.envName }};service:{{ .App.Name }};version:$(APP_VERSION)"
+    NEW_RELIC_ENABLED: true
+
+  environmentFrom:
+    - name: NEW_RELIC_LICENSE_KEY
+      valueFrom:
+        secretKeyRef:
+          name: newrelic-license-key
+          key: license-key

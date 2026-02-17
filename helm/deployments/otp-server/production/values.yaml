@@ -1,0 +1,9 @@
+app:
+  nodeSelector:
+    shotl.com/workload-type: memory-intensive
+
+  tolerations:
+    - key: shotl.com/workload-type
+      operator: Equal
+      value: memory-intensive
+      effect: NoSchedule

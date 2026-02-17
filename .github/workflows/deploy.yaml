@@ -1,0 +1,76 @@
+name: Build & Deploy
+on:
+  push:
+    branches:
+      - feature/drt-mode # Treat this branch as staging for this forked repo
+    tags:
+      - v*
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com
+  APPLICATIONS_FILE_PATH: helm
+  GITHUB_CONTEXT: ${{ toJson(github) }}
+  GH_PAT: ${{ secrets.SHOTLBOT_SHOTOOL_PAT }}
+  VALUES_REPO_NAME: platform-deployments
+  VALUES_GH_REPO_BRANCH: main
+  ARGOCD_PROJECT: shotl
+  STAGING_SLACK_WEBHOOK_URL: ${{ secrets.STAGING_DEPLOYMENT_SLACK_WEBHOOK_URL }}
+  PRODUCTION_SLACK_WEBHOOK_URL: ${{ secrets.PRODUCTION_DEPLOYMENT_SLACK_WEBHOOK_URL }}
+  LOG_LEVEL: info
+
+jobs:
+  argocd-app-stg:
+    if: endsWith(github.ref, '/feature/drt-mode')
+    environment: Staging
+    runs-on: ubuntu-latest
+    container:
+      image: 177029646271.dkr.ecr.eu-west-1.amazonaws.com/shotool:v3.0.0
+      credentials:
+        username: AWS
+        password: ${{ secrets.AWS_ECR_PASSWORD }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set deployment environment variables
+        run: |
+          echo "ENVIRONMENT=staging" >> "$GITHUB_ENV"
+          echo "ENV_SHORT=stg" >> "$GITHUB_ENV"
+          echo "ARGOCD_SERVER=argocd.stg.euw1.shotl.com" >> "$GITHUB_ENV"
+          echo "EKS_CLUSTER_NAME=shotl-stg_euw1_k8s-shotl_eks" >> "$GITHUB_ENV"
+          echo "EKS_CLUSTER_ALIAS=shotl-stg" >> "$GITHUB_ENV"
+          echo "APP_VERSION=stg-${GITHUB_SHA::8}" >> "$GITHUB_ENV"
+
+      - name: Deploy
+        run: |
+          ARGS="--app-version ${{ env.APP_VERSION }} --build --image-repository otp"
+          shotool deploy ${ARGS}
+
+  argocd-app-prod:
+    if: contains(github.ref, '/tags/')
+    environment: Production
+    runs-on: ubuntu-latest
+    container:
+      image: 177029646271.dkr.ecr.eu-west-1.amazonaws.com/shotool:v3.0.0
+      credentials:
+        username: AWS
+        password: ${{ secrets.AWS_ECR_PASSWORD }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set deployment environment variables
+        run: |
+          echo "ENVIRONMENT=production" >> "$GITHUB_ENV"
+          echo "ENV_SHORT=prod" >> "$GITHUB_ENV"
+          echo "ARGOCD_SERVER=argocd.prod.euw1.shotl.com" >> "$GITHUB_ENV"
+          echo "EKS_CLUSTER_NAME=shotl-prod_euw1_k8s-shotl_eks" >> "$GITHUB_ENV"
+          echo "EKS_CLUSTER_ALIAS=shotl-prod" >> "$GITHUB_ENV"
+          echo "APP_VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_ENV"
+
+      - name: Deploy
+        run: |
+          ARGS="--app-version ${{ env.APP_VERSION }} --build --image-repository otp"
+          shotool deploy ${ARGS}

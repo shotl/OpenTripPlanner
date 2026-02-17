@@ -1,0 +1,38 @@
+{{- $appName := "otp" -}}
+oauth2-proxy:
+  config:
+    existingSecret: {{ $appName }}-oauth2-proxy
+    configFile: |-
+      email_domains = {{ .Environment.oauth2AllowedDomains | toJson }}
+      upstreams = [ "http://otp-server.shotl.svc.cluster.local" ]
+      pass_basic_auth = false
+      pass_user_headers = true
+      pass_host_header = true
+
+  extraArgs:
+    cookie-expire: 8h0m0s
+    cookie-refresh: 1h0m0s
+
+  gatewayApi:
+    enabled: true
+    gatewayRef:
+      name: {{ .Environment.gateways.name.general }}
+      namespace: {{ .Environment.gateways.namespace }}
+    hostnames:
+      - "{{ $appName }}.{{ .Environment.publicHostedZoneDomain }}"
+    rules:
+      - backendRefs:
+          - name: "{{ $appName }}-oauth2-proxy"
+            port: 80
+            weight: 100
+        matches:
+          - path:
+              type: "PathPrefix"
+              value: "/"
+
+  resources:
+    requests:
+      cpu: 10m
+      memory: 20Mi
+    limits:
+      memory: 40Mi

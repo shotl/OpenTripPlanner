@@ -1,0 +1,14 @@
+app:
+  command: ["--max-memory", "2", "--config-files-path", "/app/config", "serve"]
+
+  resources:
+    limits:
+      memory: 2048Mi
+    requests:
+      cpu: 100m
+      memory: 2048Mi
+
+  volumes:
+    - name: build
+      emptyDir:
+        sizeLimit: 2Gi

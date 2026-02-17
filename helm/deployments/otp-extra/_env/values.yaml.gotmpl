@@ -1,0 +1,29 @@
+{{- $name := "otp" -}}
+resource-toolkit:
+  externalSecret:
+    - name: {{ $name }}-oauth2-proxy
+      spec:
+        secretStoreRef:
+          name: aws-secret-store
+          kind: ClusterSecretStore
+        target:
+          creationPolicy: "Owner"
+          template:
+            type: Opaque
+            data:
+              cookie-secret: "{{ `{{ .cookieSecret | toString }}` }}"
+              client-secret: "{{ `{{ .clientSecret | toString }}` }}"
+              client-id: "{{ `{{ .clientId | toString }}` }}"
+        data:
+          - secretKey: cookieSecret
+            remoteRef:
+              key: "{{ .Environment.envShort }}/{{ .App.Namespace }}/{{ $name }}-oauth2-proxy-secrets"
+              property: cookieSecret
+          - secretKey: clientSecret
+            remoteRef:
+              key: "{{ .Environment.envShort }}/{{ .App.Namespace }}/{{ $name }}-oauth2-proxy-secrets"
+              property: clientSecret
+          - secretKey: clientId
+            remoteRef:
+              key: "{{ .Environment.envShort }}/{{ .App.Namespace }}/{{ $name }}-oauth2-proxy-secrets"
+              property: clientId

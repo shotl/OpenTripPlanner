@@ -1,0 +1,20 @@
+namespace: &namespace "shotl"
+
+deployments:
+  - name: "otp-extra"
+    namespace: *namespace
+    chartRepo: "shotl"
+    chartName: "resource-toolkit"
+    chartVersion: "0.1.0"
+
+  - name: "otp-server"
+    namespace: *namespace
+    chartRepo: "shotl"
+    chartName: "app"
+    chartVersion: "0.4.0"
+
+  - name: "otp-oauth2-proxy" # https://artifacthub.io/packages/helm/oauth2-proxy/oauth2-proxy
+    namespace: *namespace
+    chartRepo: "oauth2-proxy"
+    chartName: "oauth2-proxy"
+    chartVersion: "10.1.3"
