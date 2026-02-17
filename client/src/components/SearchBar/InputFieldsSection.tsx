@@ -11,6 +11,7 @@ import { DirectModeSelect } from './DirectModeSelect.tsx';
 import { TransitModeSelect } from './TransitModeSelect.tsx';
 import { NumTripPatternsInput } from './NumTripPatternsInput.tsx';
 import { ItineraryFilterDebugSelect } from './ItineraryFilterDebugSelect.tsx';
+import { DrtInputFields } from './DrtInputFields.tsx';
 import GraphiQLRouteButton from './GraphiQLRouteButton.tsx';
 
 type InputFieldsSectionProps = {
@@ -59,6 +60,7 @@ export function InputFieldsSection({
         <EgressSelect tripQueryVariables={tripQueryVariables} setTripQueryVariables={setTripQueryVariables} />
         <DirectModeSelect tripQueryVariables={tripQueryVariables} setTripQueryVariables={setTripQueryVariables} />
       </div>
+      <DrtInputFields tripQueryVariables={tripQueryVariables} setTripQueryVariables={setTripQueryVariables} />
       <ItineraryFilterDebugSelect
         tripQueryVariables={tripQueryVariables}
         setTripQueryVariables={setTripQueryVariables}

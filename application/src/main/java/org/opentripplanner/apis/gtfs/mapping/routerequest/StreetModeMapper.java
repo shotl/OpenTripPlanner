@@ -105,7 +105,11 @@ public class StreetModeMapper {
       mode == StreetMode.BIKE ||
       mode == StreetMode.CAR ||
       mode == StreetMode.WALK ||
-      mode.includesParking()
+      mode.includesParking() ||
+      // Car-based pickup modes use car access exclusively
+      mode ==
+      StreetMode.CAR_HAILING ||
+      mode == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION
     );
   }
 }

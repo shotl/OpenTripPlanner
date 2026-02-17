@@ -91,15 +91,18 @@ public class CarPickupTest extends GraphRoutingTest {
 
   @Test
   public void testWalkOnlyCarPickup() {
-    // This is a special case where the reverse states differ, due to both starting in the IN_CAR
-    // state and switching to walking when encountering the first edge. This is the only valid
-    // path since a CarPickup must be in `IN_CAR` or `WALK_FROM_DROP_OFF` to be a final state,
-    // and the path can't be traversed by car.
+    // A to B - pedestrian-only street, can't drive but can walk
+    // With the fix for isFinal() to properly check CarPickupState, CAR_PICKUP searches now correctly
+    // require completion of the pickup phase. For walk-only paths:
+    // - DepartAt: Starts IN_CAR, but immediately transitions to WALK_FROM_DROP_OFF when
+    //   it encounters a pedestrian-only edge. Final state is WALK_FROM_DROP_OFF.
+    // - ArriveBy: Starts in WALK_FROM_DROP_OFF (reverse of depart), transitions to WALK_TO_PICKUP.
+    //   Final state is WALK_TO_PICKUP.
     assertPath(
       A,
       B,
-      "null - WALK_TO_PICKUP - null, WALK - WALK_TO_PICKUP - AB street",
-      "null - WALK_FROM_DROP_OFF - null, WALK - WALK_FROM_DROP_OFF - AB street"
+      "null - IN_CAR - null, WALK - WALK_FROM_DROP_OFF - AB street",
+      "null - WALK_TO_PICKUP - null, WALK - WALK_TO_PICKUP - AB street"
     );
   }
 

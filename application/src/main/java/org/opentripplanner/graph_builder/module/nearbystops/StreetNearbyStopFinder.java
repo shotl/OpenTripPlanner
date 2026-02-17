@@ -31,8 +31,12 @@ import org.opentripplanner.street.search.TraverseMode;
 import org.opentripplanner.street.search.state.State;
 import org.opentripplanner.street.search.strategy.DominanceFunctions;
 import org.opentripplanner.transit.model.site.AreaStop;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class StreetNearbyStopFinder implements NearbyStopFinder {
+
+  private static final Logger LOG = LoggerFactory.getLogger(StreetNearbyStopFinder.class);
 
   private final Duration durationLimit;
   private final int maxStopCount;
@@ -137,9 +141,18 @@ public class StreetNearbyStopFinder implements NearbyStopFinder {
 
     ShortestPathTree<State, Edge, Vertex> spt = streetSearch.getShortestPathTree();
 
+    LOG.info(
+      "[DRT-DEBUG] StreetNearbyStopFinder: streetRequest.mode={}, reverseDirection={}, originVertices={}",
+      streetRequest.mode(),
+      reverseDirection,
+      originVertices.size()
+    );
+
     // Only used if OTPFeature.FlexRouting.isOn()
     Multimap<AreaStop, State> locationsMap = ArrayListMultimap.create();
 
+    int transitStopCount = 0;
+    int transitStopFinalCount = 0;
     if (spt != null) {
       // TODO use GenericAStar and a traverseVisitor? Add an earliestArrival switch to genericAStar?
       for (State state : spt.getAllStates()) {
@@ -147,8 +160,26 @@ public class StreetNearbyStopFinder implements NearbyStopFinder {
         if (originVertices.contains(targetVertex) || ignoreVertices.contains(targetVertex)) {
           continue;
         }
-        if (targetVertex instanceof TransitStopVertex tsv && state.isFinal()) {
-          stopsFound.add(NearbyStop.nearbyStopForState(state, tsv.getStop()));
+        if (targetVertex instanceof TransitStopVertex tsv) {
+          transitStopCount++;
+          if (state.isFinal()) {
+            transitStopFinalCount++;
+            LOG.debug(
+              "[DRT-DEBUG] Found transit stop: stop={}, containsCar={}, carPickupState={}, currentMode={}",
+              tsv.getStop(),
+              state.containsModeCar(),
+              state.getCarPickupState(),
+              state.currentMode()
+            );
+            stopsFound.add(NearbyStop.nearbyStopForState(state, tsv.getStop()));
+          } else {
+            LOG.debug(
+              "[DRT-DEBUG] Transit stop NOT final: stop={}, carPickupState={}, currentMode={}",
+              tsv.getStop(),
+              state.getCarPickupState(),
+              state.currentMode()
+            );
+          }
         }
         if (
           OTPFeature.FlexRouting.isOn() &&
@@ -165,6 +196,12 @@ public class StreetNearbyStopFinder implements NearbyStopFinder {
           }
         }
       }
+      LOG.info(
+        "[DRT-DEBUG] StreetNearbyStopFinder summary: transitStopsReached={}, transitStopsFinal={}, stopsFound={}",
+        transitStopCount,
+        transitStopFinalCount,
+        stopsFound.size()
+      );
     }
 
     if (OTPFeature.FlexRouting.isOn()) {

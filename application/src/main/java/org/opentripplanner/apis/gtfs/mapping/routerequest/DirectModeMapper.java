@@ -16,6 +16,7 @@ public class DirectModeMapper {
       case CAR -> StreetMode.CAR;
       case CAR_RENTAL -> StreetMode.CAR_RENTAL;
       case CAR_PARKING -> StreetMode.CAR_TO_PARK;
+      case DRT -> StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION;
       case FLEX -> StreetMode.FLEXIBLE;
       case SCOOTER_RENTAL -> StreetMode.SCOOTER_RENTAL;
       case WALK -> StreetMode.WALK;
@@ -30,13 +31,10 @@ public class DirectModeMapper {
       case CAR -> GraphQLTypes.GraphQLPlanDirectMode.CAR;
       case CAR_RENTAL -> GraphQLTypes.GraphQLPlanDirectMode.CAR_RENTAL;
       case CAR_TO_PARK -> GraphQLTypes.GraphQLPlanDirectMode.CAR_PARKING;
+      case DEMAND_RESPONSIVE_TRANSPORTATION -> GraphQLTypes.GraphQLPlanDirectMode.DRT;
       case FLEXIBLE -> GraphQLTypes.GraphQLPlanDirectMode.FLEX;
       case SCOOTER_RENTAL -> GraphQLTypes.GraphQLPlanDirectMode.SCOOTER_RENTAL;
-      case WALK,
-        CAR_HAILING,
-        DEMAND_RESPONSIVE_TRANSPORTATION,
-        CAR_PICKUP,
-        NOT_SET -> GraphQLTypes.GraphQLPlanDirectMode.WALK;
+      case WALK, CAR_HAILING, CAR_PICKUP, NOT_SET -> GraphQLTypes.GraphQLPlanDirectMode.WALK;
     };
   }
 }

@@ -415,9 +415,19 @@ public class StreetIndex {
     // for park and ride we will start in car mode and walk to the end vertex
     boolean parkAndRideDepart = streetMode == StreetMode.CAR_TO_PARK && !endVertex;
     boolean onlyCarAvailable = streetMode == StreetMode.CAR;
-    if (onlyCarAvailable || parkAndRideDepart) {
+    // for car hailing and DRT, we need car access to pick up passengers
+    boolean carPickupMode =
+      streetMode == StreetMode.CAR_HAILING ||
+      streetMode == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION;
+    if (onlyCarAvailable || parkAndRideDepart || carPickupMode) {
       nonTransitMode = TraverseMode.CAR;
     }
+    LOG.info(
+      "[DRT-DEBUG] getTraverseModeForLinker: streetMode={}, endVertex={}, result={}",
+      streetMode,
+      endVertex,
+      nonTransitMode
+    );
     return nonTransitMode;
   }
 

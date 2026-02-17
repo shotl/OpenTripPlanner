@@ -14,6 +14,8 @@ import org.opentripplanner.apis.transmodel.TransmodelRequestContext;
 import org.opentripplanner.apis.transmodel.model.plan.TripQuery;
 import org.opentripplanner.apis.transmodel.support.DataFetcherDecorator;
 import org.opentripplanner.apis.transmodel.support.GqlUtil;
+import org.opentripplanner.routing.api.request.DemandResponsiveExtData;
+import org.opentripplanner.routing.api.request.Passengers;
 import org.opentripplanner.routing.api.request.RouteRequest;
 import org.opentripplanner.standalone.api.OtpServerRequestContext;
 import org.opentripplanner.transit.model.framework.FeedScopedId;
@@ -102,6 +104,41 @@ public class TripRequestMapper {
       PreferencesMapper.mapPreferences(environment, callWith, preferences)
     );
 
+    if (GqlUtil.hasArgument(environment, "drt")) {
+      setDrtInput(request, environment.getArgument("drt"));
+    }
+
     return request;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static void setDrtInput(RouteRequest request, Map<String, Object> drtInput) {
+    if (drtInput == null) {
+      return;
+    }
+
+    String paxAppId = (String) drtInput.get("paxAppId");
+    String userId = (String) drtInput.get("userId");
+    String areaId = (String) drtInput.get("areaId");
+    String rideType = (String) drtInput.get("rideType");
+
+    Passengers passengers = null;
+    Map<String, Object> passengersMap = (Map<String, Object>) drtInput.get("passengers");
+    if (passengersMap != null) {
+      Integer regular = (Integer) passengersMap.get("regular");
+      Integer wheelchair = (Integer) passengersMap.get("wheelchair");
+      passengers = new Passengers(
+        regular != null ? regular : 1,
+        wheelchair != null ? wheelchair : 0
+      );
+    }
+
+    if (
+      paxAppId != null || userId != null || areaId != null || rideType != null || passengers != null
+    ) {
+      request.setDemandResponsiveExtData(
+        new DemandResponsiveExtData(paxAppId, userId, areaId, rideType, passengers)
+      );
+    }
   }
 }

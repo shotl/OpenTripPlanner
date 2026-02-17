@@ -70,7 +70,7 @@ public class RouteRequestMapper {
     // sadly we need to use the raw collection because it is cast to the wrong type
     mapViaPoints(request, environment.getArgument("via"));
 
-    setDrtInput(request, args.getGraphQLDrtInput());
+    setDrtInput(request, args.getGraphQLDrt());
 
     return request;
   }
@@ -192,20 +192,37 @@ public class RouteRequestMapper {
     request.setViaLocations(ViaLocationMapper.mapToViaLocations(via));
   }
 
-  private static void setDrtInput(RouteRequest request, GraphQLTypes.GraphQLDRTInput drtInput) {
-    if (drtInput != null) {
-      request.setDemandResponsiveExtData(
-        new DemandResponsiveExtData(
-          drtInput.getGraphQLPaxAppId(),
-          drtInput.getGraphQLUserId(),
-          drtInput.getGraphQLAreaId(),
-          drtInput.getGraphQLRideType(),
-          new Passengers(
-            drtInput.getGraphQLPassengers().getGraphQLRegular(),
-            drtInput.getGraphQLPassengers().getGraphQLWheelchair()
-          )
-        )
-      );
+  private static void setDrtInput(RouteRequest request, GraphQLTypes.GraphQLDrtInput drtInput) {
+    // Check if drtInput has meaningful data (not just an empty object from the code generator)
+    if (drtInput == null || !hasDrtData(drtInput)) {
+      return;
     }
+
+    var passengers = drtInput.getGraphQLPassengers();
+    request.setDemandResponsiveExtData(
+      new DemandResponsiveExtData(
+        drtInput.getGraphQLPaxAppId(),
+        drtInput.getGraphQLUserId(),
+        drtInput.getGraphQLAreaId(),
+        drtInput.getGraphQLRideType(),
+        passengers != null
+          ? new Passengers(passengers.getGraphQLRegular(), passengers.getGraphQLWheelchair())
+          : null
+      )
+    );
+  }
+
+  /**
+   * Check if the DRT input has any meaningful data. The GraphQL code generator may create
+   * an empty object even when no drt input was provided in the query.
+   */
+  private static boolean hasDrtData(GraphQLTypes.GraphQLDrtInput drtInput) {
+    return (
+      drtInput.getGraphQLPaxAppId() != null ||
+      drtInput.getGraphQLUserId() != null ||
+      drtInput.getGraphQLAreaId() != null ||
+      drtInput.getGraphQLRideType() != null ||
+      drtInput.getGraphQLPassengers() != null
+    );
   }
 }

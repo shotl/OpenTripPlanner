@@ -10,9 +10,9 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationService;
+import org.opentripplanner.ext.demandresponsivetransportation.CachingDemandResponsiveTransportationService;
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationServiceParameters;
+import org.opentripplanner.ext.demandresponsivetransportation.DrtRequestContext;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
 import org.opentripplanner.framework.io.OtpHttpClient;
 import org.opentripplanner.framework.io.OtpHttpClientFactory;
@@ -21,9 +21,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Implementation of a ride hailing service for Uber.
+ * Implementation of a demand responsive transportation service for Shotl.
  */
-public class ShotlService implements DemandResponsiveTransportationService {
+public class ShotlService extends CachingDemandResponsiveTransportationService {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShotlService.class);
   private static final String DEFAULT_TIME_ESTIMATE_PATH = "drt/time-estimations";
@@ -43,7 +43,8 @@ public class ShotlService implements DemandResponsiveTransportationService {
     this.otpHttpClient = new OtpHttpClientFactory().create(LOG);
   }
 
-  public ShotlArrivalEstimateResponse arrivalTimes(
+  @Override
+  protected ShotlArrivalEstimateResponse queryArrivalTimes(
     String paxAppId,
     String areaId,
     String userId,
@@ -52,8 +53,9 @@ public class ShotlService implements DemandResponsiveTransportationService {
     WgsCoordinate toCoordinate,
     int regularPassengers,
     int wheelchairPassengers,
-    Instant desiredPickupTime
-  ) throws ExecutionException, IOException {
+    Instant desiredPickupTime,
+    DrtRequestContext context
+  ) throws IOException {
     var uri = UriBuilder.fromUri(timeEstimateUri).build();
 
     // Create the request body
@@ -86,25 +88,68 @@ public class ShotlService implements DemandResponsiveTransportationService {
     // Convert request to JsonNode
     var jsonBody = MAPPER.valueToTree(request);
 
-    LOG.info("Made arrival time request to Shotl API at following URL: {}", uri);
+    LOG.info(
+      "[DRT] API REQUEST | context={} | url={} | areaId={} | userId={} | rideType={} | " +
+      "from=({},{}) | to=({},{}) | passengers=(regular={}, wheelchair={}) | pickupTime={}",
+      context,
+      uri,
+      areaId,
+      userId,
+      rideType,
+      fromCoordinate.latitude(),
+      fromCoordinate.longitude(),
+      toCoordinate.latitude(),
+      toCoordinate.longitude(),
+      regularPassengers,
+      wheelchairPassengers,
+      desiredPickupTime
+    );
 
-    ShotlArrivalEstimateResponse response = otpHttpClient.postJsonAndMap(
+    LOG.debug("[DRT] API REQUEST BODY | context={} | body={}", context, jsonBody);
+
+    ShotlApiResponse apiResponse = otpHttpClient.postJsonAndMap(
       uri,
       jsonBody,
       Duration.ofSeconds(60),
       headers(paxAppId),
       is -> {
         try {
-          return MAPPER.readValue(is, ShotlArrivalEstimateResponse.class);
+          return MAPPER.readValue(is, ShotlApiResponse.class);
         } catch (Exception e) {
-          throw new RuntimeException(e);
+          LOG.error("[DRT] API PARSE ERROR | context={} | error={}", context, e.getMessage(), e);
+          throw new RuntimeException("Failed to parse Shotl API response", e);
         }
       }
     );
 
-    LOG.info("Received {} Shotl arrival time estimates", response);
+    if (!apiResponse.success()) {
+      var reason = apiResponse.reason();
+      LOG.warn(
+        "[DRT] API REJECTION | context={} | areaId={} | code={} | message={} | displayMessage={} | details={}",
+        context,
+        areaId,
+        reason != null ? reason.code() : "unknown",
+        reason != null ? reason.message() : "unknown",
+        reason != null ? reason.displayMessage() : null,
+        reason != null ? reason.details() : null
+      );
+      throw new ShotlBusinessRejectionException(reason);
+    }
 
-    return response;
+    var data = apiResponse.data();
+    LOG.info(
+      "[DRT] API SUCCESS | context={} | areaId={} | id={} | userExpectedPickupTime={} | " +
+      "userExpectedDropoffTime={} | status={} | vehicleId={}",
+      context,
+      areaId,
+      data.id(),
+      data.userExpectedPickupTime(),
+      data.userExpectedDropoffTime(),
+      data.status(),
+      data.vehicleId()
+    );
+
+    return convertToArrivalEstimateResponse(data);
   }
 
   private Map<String, String> headers(String paxAppId) throws IOException {
@@ -112,6 +157,56 @@ public class ShotlService implements DemandResponsiveTransportationService {
       entry(ACCEPT_LANGUAGE, "en_US"),
       entry(CONTENT_TYPE, "application/json"),
       entry("Shotl-Passenger-App-Id", paxAppId)
+    );
+  }
+
+  /**
+   * Converts the API response data to the existing ShotlArrivalEstimateResponse format.
+   */
+  private ShotlArrivalEstimateResponse convertToArrivalEstimateResponse(
+    ShotlApiResponse.EstimatedTimesData data
+  ) {
+    return new ShotlArrivalEstimateResponse(
+      data.id(),
+      data.userId(),
+      data.type(),
+      data.status(),
+      data.code(),
+      new ShotlArrivalEstimateResponse.ShotlGeoLocation(
+        data.desiredPickupLocation().latitude(),
+        data.desiredPickupLocation().longitude()
+      ),
+      new ShotlArrivalEstimateResponse.ShotlGeoLocation(
+        data.desiredDropoffLocation().latitude(),
+        data.desiredDropoffLocation().longitude()
+      ),
+      convertScheduledPlace(data.scheduledPickupPlace()),
+      convertScheduledPlace(data.scheduledDropoffPlace()),
+      data.desiredPickupTime(),
+      data.desiredDropoffTime(),
+      data.userExpectedPickupTime(),
+      data.userExpectedDropoffTime(),
+      data.petitionTime(),
+      new ShotlArrivalEstimateResponse.ShotlPassengers(
+        data.passengers().regular(),
+        data.passengers().wheelchair()
+      ),
+      data.vehicleId()
+    );
+  }
+
+  private ShotlArrivalEstimateResponse.ShotlScheduledGeoLocation convertScheduledPlace(
+    ShotlApiResponse.ScheduledGeoLocation place
+  ) {
+    if (place == null) {
+      return null;
+    }
+    return new ShotlArrivalEstimateResponse.ShotlScheduledGeoLocation(
+      new ShotlArrivalEstimateResponse.ShotlGeoLocation(
+        place.location().latitude(),
+        place.location().longitude()
+      ),
+      place.name()
     );
   }
 }

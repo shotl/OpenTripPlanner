@@ -12,6 +12,17 @@ import org.opentripplanner.framework.geometry.WgsCoordinate;
 public interface DemandResponsiveTransportationService {
   /**
    * Get the next arrivals for a specific location.
+   *
+   * @param paxAppId the passenger app ID
+   * @param areaId the DRT service area ID
+   * @param userId the user ID
+   * @param rideType the type of ride
+   * @param fromCoordinate pickup location
+   * @param toCoordinate dropoff location
+   * @param regularPassengers number of regular passengers
+   * @param wheelchairPassengers number of wheelchair passengers
+   * @param desiredPickupTime requested pickup time
+   * @param context identifies the caller (shifting vs decorating) for logging
    */
   ShotlArrivalEstimateResponse arrivalTimes(
     String paxAppId,
@@ -22,6 +33,7 @@ public interface DemandResponsiveTransportationService {
     WgsCoordinate toCoordinate,
     int regularPassengers,
     int wheelchairPassengers,
-    Instant desiredPickupTime
+    Instant desiredPickupTime,
+    DrtRequestContext context
   ) throws ExecutionException, IOException;
 }

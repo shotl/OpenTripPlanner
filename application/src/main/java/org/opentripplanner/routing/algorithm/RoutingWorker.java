@@ -138,8 +138,11 @@ public class RoutingWorker {
     // Filter itineraries
     List<Itinerary> filteredItineraries;
     {
-      boolean removeWalkAllTheWayResultsFromDirectFlex =
-        request.journey().direct().mode() == StreetMode.FLEXIBLE;
+      // Remove walk-only results when using direct flex or DRT modes since we expect
+      // actual flex/DRT service usage, not just walking
+      boolean removeWalkAllTheWayResultsFromDirectFlexOrDrt =
+        request.journey().direct().mode() == StreetMode.FLEXIBLE ||
+        request.journey().direct().mode() == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION;
 
       ItineraryListFilterChain filterChain = RouteRequestToFilterChainMapper.createFilterChain(
         request,
@@ -147,7 +150,7 @@ public class RoutingWorker {
         earliestDepartureTimeUsed(),
         searchWindowUsed(),
         emptyDirectModeHandler.removeWalkAllTheWayResults() ||
-        removeWalkAllTheWayResultsFromDirectFlex,
+        removeWalkAllTheWayResultsFromDirectFlexOrDrt,
         it -> pageCursorInput = it
       );
 

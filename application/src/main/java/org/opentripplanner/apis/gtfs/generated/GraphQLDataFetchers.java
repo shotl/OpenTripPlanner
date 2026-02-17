@@ -2,7 +2,11 @@
 package org.opentripplanner.apis.gtfs.generated;
 
 import graphql.relay.Connection;
+import graphql.relay.Connection;
+import graphql.relay.Connection;
 import graphql.relay.DefaultEdge;
+import graphql.relay.Edge;
+import graphql.relay.Edge;
 import graphql.relay.Edge;
 import graphql.schema.DataFetcher;
 import graphql.schema.TypeResolver;
@@ -31,13 +35,18 @@ import org.opentripplanner.apis.gtfs.model.DRTScheduledGeoLocation;
 import org.opentripplanner.apis.gtfs.model.FeedPublisher;
 import org.opentripplanner.apis.gtfs.model.PlanPageInfo;
 import org.opentripplanner.apis.gtfs.model.RideHailingProvider;
+import org.opentripplanner.apis.gtfs.model.RouteTypeModel;
+import org.opentripplanner.apis.gtfs.model.StopOnRouteModel;
+import org.opentripplanner.apis.gtfs.model.StopOnTripModel;
 import org.opentripplanner.apis.gtfs.model.StopPosition;
 import org.opentripplanner.apis.gtfs.model.TripOccupancy;
+import org.opentripplanner.apis.gtfs.model.UnknownModel;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.ext.fares.model.FareRuleSet;
 import org.opentripplanner.ext.ridehailing.model.RideEstimate;
 import org.opentripplanner.model.StopTimesInPattern;
 import org.opentripplanner.model.SystemNotice;
+import org.opentripplanner.model.TripTimeOnDate;
 import org.opentripplanner.model.TripTimeOnDate;
 import org.opentripplanner.model.calendar.openinghours.OHCalendar;
 import org.opentripplanner.model.fare.FareMedium;
@@ -59,6 +68,8 @@ import org.opentripplanner.routing.graphfinder.PlaceAtDistance;
 import org.opentripplanner.service.realtimevehicles.model.RealtimeVehicle;
 import org.opentripplanner.service.realtimevehicles.model.RealtimeVehicle.StopRelationship;
 import org.opentripplanner.service.vehicleparking.model.VehicleParking;
+import org.opentripplanner.service.vehicleparking.model.VehicleParking;
+import org.opentripplanner.service.vehicleparking.model.VehicleParking;
 import org.opentripplanner.service.vehicleparking.model.VehicleParkingSpaces;
 import org.opentripplanner.service.vehicleparking.model.VehicleParkingState;
 import org.opentripplanner.service.vehiclerental.model.RentalVehicleEntityCounts;
@@ -66,7 +77,9 @@ import org.opentripplanner.service.vehiclerental.model.RentalVehicleFuel;
 import org.opentripplanner.service.vehiclerental.model.RentalVehicleType;
 import org.opentripplanner.service.vehiclerental.model.RentalVehicleTypeCount;
 import org.opentripplanner.service.vehiclerental.model.VehicleRentalPlace;
+import org.opentripplanner.service.vehiclerental.model.VehicleRentalPlace;
 import org.opentripplanner.service.vehiclerental.model.VehicleRentalStation;
+import org.opentripplanner.service.vehiclerental.model.VehicleRentalStationUris;
 import org.opentripplanner.service.vehiclerental.model.VehicleRentalStationUris;
 import org.opentripplanner.service.vehiclerental.model.VehicleRentalSystem;
 import org.opentripplanner.service.vehiclerental.model.VehicleRentalVehicle;
@@ -355,6 +368,41 @@ public class GraphQLDataFetchers {
     public DataFetcher<Integer> digits();
   }
 
+  /** Response type for a Shotl arrival estimate, containing details of a quoted ride. */
+  public interface GraphQLDrtEstimate {
+    public DataFetcher<String> code();
+
+    public DataFetcher<Object> desiredDropoffLocation();
+
+    public DataFetcher<Long> desiredDropoffTime();
+
+    public DataFetcher<Object> desiredPickupLocation();
+
+    public DataFetcher<Long> desiredPickupTime();
+
+    public DataFetcher<String> id();
+
+    public DataFetcher<Object> passengers();
+
+    public DataFetcher<Long> petitionTime();
+
+    public DataFetcher<Object> scheduledDropoffPlace();
+
+    public DataFetcher<Object> scheduledPickupPlace();
+
+    public DataFetcher<String> status();
+
+    public DataFetcher<String> type();
+
+    public DataFetcher<Long> userExpectedDropoffTime();
+
+    public DataFetcher<Long> userExpectedPickupTime();
+
+    public DataFetcher<String> userId();
+
+    public DataFetcher<String> vehicleId();
+  }
+
   /**
    * The standard case of a fare product: it only has a single price to be paid by the passenger
    * and no discounts are applied.
@@ -529,6 +577,8 @@ public class GraphQLDataFetchers {
 
     public DataFetcher<GraphQLPickupDropoffType> dropoffType();
 
+    public DataFetcher<ShotlArrivalEstimateResponse> drtEstimate();
+
     public DataFetcher<Double> duration();
 
     public DataFetcher<LegCallTime> end();
@@ -572,8 +622,6 @@ public class GraphQLDataFetchers {
     public DataFetcher<Boolean> rentedBike();
 
     public DataFetcher<RideEstimate> rideHailingEstimate();
-
-    public DataFetcher<ShotlArrivalEstimateResponse> drtEstimate();
 
     public DataFetcher<Route> route();
 
@@ -990,62 +1038,6 @@ public class GraphQLDataFetchers {
     public DataFetcher<String> id();
   }
 
-  /** Response type for a Shotl arrival estimate, containing details of a quoted ride. */
-  public interface GraphQLDrtEstimate {
-    public DataFetcher<String> id();
-
-    public DataFetcher<String> userId();
-
-    public DataFetcher<String> type();
-
-    public DataFetcher<String> status();
-
-    public DataFetcher<String> code();
-
-    public DataFetcher<DRTGeoLocation> desiredPickupLocation();
-
-    public DataFetcher<DRTGeoLocation> desiredDropoffLocation();
-
-    public DataFetcher<DRTScheduledGeoLocation> scheduledPickupPlace();
-
-    public DataFetcher<DRTScheduledGeoLocation> scheduledDropoffPlace();
-
-    public DataFetcher<Long> desiredPickupTime();
-
-    public DataFetcher<Long> desiredDropoffTime();
-
-    public DataFetcher<Long> userExpectedPickupTime();
-
-    public DataFetcher<Long> userExpectedDropoffTime();
-
-    public DataFetcher<Long> petitionTime();
-
-    public DataFetcher<DRTPassengers> passengers();
-
-    public DataFetcher<String> vehicleId();
-  }
-
-  /** Represents passenger counts for a Shotl ride. */
-  public interface GraphQLShotlPassengers {
-    public DataFetcher<Integer> regular();
-
-    public DataFetcher<Integer> wheelchair();
-  }
-
-  /** Represents a geographic location for Shotl services. */
-  public interface GraphQLShotlGeoLocation {
-    public DataFetcher<Double> latitude();
-
-    public DataFetcher<Double> longitude();
-  }
-
-  /** Represents a scheduled geographic location for Shotl services, including a name. */
-  public interface GraphQLShotlScheduledGeoLocation {
-    public DataFetcher<GraphQLShotlGeoLocation> location();
-
-    public DataFetcher<String> name();
-  }
-
   /** Category of riders a fare product applies to, for example students or pensioners. */
   public interface GraphQLRiderCategory {
     public DataFetcher<String> id();
@@ -1115,6 +1107,27 @@ public class GraphQLDataFetchers {
     public DataFetcher<String> description();
 
     public DataFetcher<GraphQLInputField> inputField();
+  }
+
+  /** Represents a geographic location for Shotl services. */
+  public interface GraphQLShotlGeoLocation {
+    public DataFetcher<Double> latitude();
+
+    public DataFetcher<Double> longitude();
+  }
+
+  /** Represents passenger counts for a Shotl ride. */
+  public interface GraphQLShotlPassengers {
+    public DataFetcher<Integer> regular();
+
+    public DataFetcher<Integer> wheelchair();
+  }
+
+  /** Represents a scheduled geographic location for Shotl services, including a name. */
+  public interface GraphQLShotlScheduledGeoLocation {
+    public DataFetcher<Object> location();
+
+    public DataFetcher<String> name();
   }
 
   /** A feature for a step */

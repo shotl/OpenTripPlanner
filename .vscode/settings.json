@@ -8,5 +8,6 @@
             "default": true
         }
     ],
-    "maven.java.home": "/Users/abel/.sdkman/candidates/java/21.0.7-tem"
+    "maven.java.home": "/Users/abel/.sdkman/candidates/java/21.0.7-tem",
+    "makefile.configureOnOpen": false
 }

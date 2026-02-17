@@ -12,6 +12,8 @@ import org.opentripplanner.routing.api.request.StreetMode;
 import org.opentripplanner.street.model.RentalFormFactor;
 import org.opentripplanner.street.search.TraverseMode;
 import org.opentripplanner.street.search.request.StreetSearchRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * StateData contains the components of search state that are unlikely to be changed as often as
@@ -19,6 +21,8 @@ import org.opentripplanner.street.search.request.StreetSearchRequest;
  * time and space use during searches.
  */
 public class StateData implements Cloneable {
+
+  private static final Logger LOG = LoggerFactory.getLogger(StateData.class);
 
   protected boolean vehicleParked;
 
@@ -141,16 +145,31 @@ public class StateData implements Cloneable {
     //   - WALK / WALK_FROM_DROP_OFF or WALK_TO_PICKUP for cases with an initial walk
     // For forward/reverse searches to be symmetric both initial states need to be created.
     if (requestMode.includesPickup()) {
+      LOG.info(
+        "[DRT-DEBUG] StateData.getInitialStateDatas: creating pickup states for mode={}, arriveBy={}",
+        requestMode,
+        arriveBy
+      );
       var inCarPickupStateData = proto.clone();
       inCarPickupStateData.carPickupState = CarPickupState.IN_CAR;
       inCarPickupStateData.currentMode = TraverseMode.CAR;
       res.add(inCarPickupStateData);
+      LOG.info(
+        "[DRT-DEBUG] Created IN_CAR state: carPickupState={}, currentMode={}",
+        inCarPickupStateData.carPickupState,
+        inCarPickupStateData.currentMode
+      );
       var walkingPickupStateData = proto.clone();
       walkingPickupStateData.carPickupState = arriveBy
         ? CarPickupState.WALK_FROM_DROP_OFF
         : CarPickupState.WALK_TO_PICKUP;
       walkingPickupStateData.currentMode = TraverseMode.WALK;
       res.add(walkingPickupStateData);
+      LOG.info(
+        "[DRT-DEBUG] Created WALK state: carPickupState={}, currentMode={}",
+        walkingPickupStateData.carPickupState,
+        walkingPickupStateData.currentMode
+      );
     }
     // Vehicle rental searches may end in four states (see State#isFinal()):
     // When searching forward:

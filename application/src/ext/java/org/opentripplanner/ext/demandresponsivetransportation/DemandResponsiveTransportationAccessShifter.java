@@ -23,11 +23,6 @@ public class DemandResponsiveTransportationAccessShifter {
   private static final Logger LOG = LoggerFactory.getLogger(
     DemandResponsiveTransportationAccessShifter.class
   );
-  /**
-   * When is a start time far enough in the future so that we don't need to check the service and
-   * simply presume that a vehicle can arrive on time.
-   */
-  private static final Duration MAX_DURATION_FROM_NOW = Duration.ofMinutes(30);
 
   /**
    * Given a list of {@link RoutingAccessEgress}, shift the access ones that contain driving
@@ -109,9 +104,10 @@ public class DemandResponsiveTransportationAccessShifter {
   }
 
   private static boolean shouldShift(RouteRequest req, Instant now) {
+    // For DRT services, we always check with the service API regardless of how far in the future
+    // the request is, since DRT has limited capacity and specific schedules unlike ride-hailing.
     return (
       req.journey().modes().accessMode == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION &&
-      req.dateTime().isBefore(now.plus(MAX_DURATION_FROM_NOW)) && // TODO review this for DRT
       !req.arriveBy()
     );
   }
@@ -128,7 +124,10 @@ public class DemandResponsiveTransportationAccessShifter {
     try {
       var service = services.get(0);
 
-      LOG.info("shifting access for DRT");
+      // Use the user's requested departure time, not "now"
+      Instant desiredPickupTime = req.dateTime();
+
+      LOG.info("shifting access for DRT, desired pickup time: {}", desiredPickupTime);
 
       var drtEstimationResponse = service.arrivalTimes(
         req.demandResponsiveExtData().paxAppId(),
@@ -139,7 +138,8 @@ public class DemandResponsiveTransportationAccessShifter {
         new WgsCoordinate(req.to().getCoordinate()),
         req.demandResponsiveExtData().passengers().regular(),
         req.demandResponsiveExtData().passengers().wheelchair(),
-        now
+        desiredPickupTime,
+        DrtRequestContext.ACCESS_SHIFTING
       );
       if (drtEstimationResponse == null) {
         return Result.failure(Error.NO_ARRIVAL_FOR_LOCATION);
@@ -149,17 +149,20 @@ public class DemandResponsiveTransportationAccessShifter {
         drtEstimationResponse.user_expected_pickup_time()
       );
 
-      // Calculate the difference between expected pickup time and now
-      Duration pickupDelay = Duration.between(now, userExpectedPickupTime);
-
-      // Adjust for the difference between request time and now
-      Duration untilReqTime = Duration.between(now, req.dateTime());
-      Duration totalDelay = pickupDelay.minus(untilReqTime);
+      // Calculate how much later than requested the actual pickup will be
+      Duration totalDelay = Duration.between(desiredPickupTime, userExpectedPickupTime);
 
       // Ensure the delay is not negative
       if (totalDelay.isNegative()) {
         totalDelay = Duration.ZERO;
       }
+
+      LOG.info(
+        "DRT time shift: requested={}, expected={}, delay={}",
+        desiredPickupTime,
+        userExpectedPickupTime,
+        totalDelay
+      );
 
       return Result.success(totalDelay);
     } catch (ExecutionException e) {

@@ -606,6 +606,15 @@ public class TripQuery {
           )
           .build()
       )
+      .argument(
+        GraphQLArgument.newArgument()
+          .name("drt")
+          .description(
+            "DRT (Demand Responsive Transport) configuration for the trip planning request."
+          )
+          .type(DRTInputType.INPUT_TYPE)
+          .build()
+      )
       .dataFetcher(environment -> new TransmodelGraphQLPlanner().plan(environment))
       .build();
   }

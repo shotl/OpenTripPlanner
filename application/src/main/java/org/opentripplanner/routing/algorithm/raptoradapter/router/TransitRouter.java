@@ -51,8 +51,12 @@ import org.opentripplanner.transit.model.framework.EntityNotFoundException;
 import org.opentripplanner.transit.model.framework.FeedScopedId;
 import org.opentripplanner.transit.model.network.grouppriority.TransitGroupPriorityService;
 import org.opentripplanner.transit.model.site.StopLocation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TransitRouter {
+
+  private static final Logger LOG = LoggerFactory.getLogger(TransitRouter.class);
 
   public static final int NOT_SET = -1;
 
@@ -253,6 +257,8 @@ public class TransitRouter {
     var streetRequest = type.isAccess() ? request.journey().access() : request.journey().egress();
     StreetMode mode = streetRequest.mode();
 
+    LOG.info("[DRT-DEBUG] fetchAccessEgresses: type={}, mode={}", type, mode);
+
     // Prepare access/egress lists
     RouteRequest accessRequest = request.clone();
 
@@ -282,9 +288,38 @@ public class TransitRouter {
       durationLimit,
       stopCountLimit
     );
+
+    LOG.info(
+      "[DRT-DEBUG] nearbyStops found: count={}, durationLimit={}, stopCountLimit={}",
+      nearbyStops.size(),
+      durationLimit,
+      stopCountLimit
+    );
+    for (var stop : nearbyStops) {
+      LOG.info(
+        "[DRT-DEBUG] nearbyStop: stop={}, containsCar={}, isFinal={}, carPickupState={}, currentMode={}",
+        stop.stop,
+        stop.state.containsModeCar(),
+        stop.state.isFinal(),
+        stop.state.getCarPickupState(),
+        stop.state.currentMode()
+      );
+    }
+
     var accessEgresses = AccessEgressMapper.mapNearbyStops(nearbyStops, type);
 
+    LOG.info("[DRT-DEBUG] accessEgresses after mapping: count={}", accessEgresses.size());
+    for (var ae : accessEgresses) {
+      LOG.info(
+        "[DRT-DEBUG] accessEgress: containsModeCar={}, durationInSeconds={}",
+        ae.getLastState().containsModeCar(),
+        ae.durationInSeconds()
+      );
+    }
+
     accessEgresses = timeshiftRideHailing(streetRequest, type, accessEgresses);
+
+    LOG.info("[DRT-DEBUG] accessEgresses after timeshifting: count={}", accessEgresses.size());
 
     var results = new ArrayList<>(accessEgresses);
 

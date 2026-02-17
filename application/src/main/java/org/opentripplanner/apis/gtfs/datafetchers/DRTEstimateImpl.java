@@ -36,7 +36,7 @@ public class DRTEstimateImpl implements GraphQLDataFetchers.GraphQLDrtEstimate {
   }
 
   @Override
-  public DataFetcher<DRTGeoLocation> desiredPickupLocation() {
+  public DataFetcher<Object> desiredPickupLocation() {
     return env -> {
       ShotlArrivalEstimateResponse.ShotlGeoLocation location = getSource(
         env
@@ -46,7 +46,7 @@ public class DRTEstimateImpl implements GraphQLDataFetchers.GraphQLDrtEstimate {
   }
 
   @Override
-  public DataFetcher<DRTGeoLocation> desiredDropoffLocation() {
+  public DataFetcher<Object> desiredDropoffLocation() {
     return env -> {
       ShotlArrivalEstimateResponse.ShotlGeoLocation location = getSource(
         env
@@ -56,7 +56,7 @@ public class DRTEstimateImpl implements GraphQLDataFetchers.GraphQLDrtEstimate {
   }
 
   @Override
-  public DataFetcher<DRTScheduledGeoLocation> scheduledPickupPlace() {
+  public DataFetcher<Object> scheduledPickupPlace() {
     return env -> {
       ShotlArrivalEstimateResponse.ShotlScheduledGeoLocation scheduledPlace = getSource(
         env
@@ -73,7 +73,7 @@ public class DRTEstimateImpl implements GraphQLDataFetchers.GraphQLDrtEstimate {
   }
 
   @Override
-  public DataFetcher<DRTScheduledGeoLocation> scheduledDropoffPlace() {
+  public DataFetcher<Object> scheduledDropoffPlace() {
     return env -> {
       ShotlArrivalEstimateResponse.ShotlScheduledGeoLocation scheduledPlace = getSource(
         env
@@ -115,7 +115,7 @@ public class DRTEstimateImpl implements GraphQLDataFetchers.GraphQLDrtEstimate {
   }
 
   @Override
-  public DataFetcher<DRTPassengers> passengers() {
+  public DataFetcher<Object> passengers() {
     return env -> {
       ShotlArrivalEstimateResponse.ShotlPassengers passengers = getSource(env).passengers();
       return new DRTPassengers(passengers.regular(), passengers.wheelchair());

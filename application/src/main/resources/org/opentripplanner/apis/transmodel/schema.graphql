@@ -156,6 +156,60 @@ type Contact {
   url: String
 }
 
+"Response type for a DRT (Shotl) arrival estimate, containing details of a quoted ride."
+type DRTEstimate {
+  "A code associated with the ride."
+  code: String!
+  "Desired dropoff location for the ride."
+  desiredDropoffLocation: DRTGeoLocation!
+  "Desired dropoff time as epoch seconds."
+  desiredDropoffTime: Long
+  "Desired pickup location for the ride."
+  desiredPickupLocation: DRTGeoLocation!
+  "Desired pickup time as epoch seconds."
+  desiredPickupTime: Long!
+  "Unique identifier for the quoted ride."
+  id: String!
+  "Passenger details for the ride."
+  passengers: DRTPassengers!
+  "Petition time for the ride as epoch seconds."
+  petitionTime: Long!
+  "Scheduled dropoff place, including location and name."
+  scheduledDropoffPlace: DRTScheduledGeoLocation!
+  "Scheduled pickup place, including location and name."
+  scheduledPickupPlace: DRTScheduledGeoLocation!
+  "Current status of the ride."
+  status: String!
+  "Type of the ride."
+  type: String!
+  "User expected dropoff time as epoch seconds."
+  userExpectedDropoffTime: Long!
+  "User expected pickup time as epoch seconds."
+  userExpectedPickupTime: Long!
+  "Identifier for the user."
+  userId: String!
+  "Identifier for the vehicle assigned to the ride."
+  vehicleId: String
+}
+
+"Geographic location for a DRT ride."
+type DRTGeoLocation {
+  latitude: Float!
+  longitude: Float!
+}
+
+"Passenger details for a DRT ride."
+type DRTPassengers {
+  regular: Int!
+  wheelchair: Int!
+}
+
+"Scheduled geographic location for a DRT ride, including a name."
+type DRTScheduledGeoLocation {
+  location: DRTGeoLocation!
+  name: String
+}
+
 "A planned journey on a specific day"
 type DatedServiceJourney {
   "Returns scheduled passingTimes for this dated service journey, updated with real-time-updates (if available). "
@@ -307,6 +361,8 @@ type Leg {
   directDuration: Long!
   "The distance traveled while traversing the leg in meters."
   distance: Float!
+  "Estimate of a DRT ride (e.g. Shotl). Only present for DRT legs."
+  drtEstimate: DRTEstimate
   "The leg's duration in seconds"
   duration: Long!
   """
@@ -780,7 +836,7 @@ type QueryType {
   "Input type for executing a travel search for a trip between two locations. Returns trip patterns describing suggested alternatives for the trip."
   trip(
     "Time and cost penalty on access/egress modes."
-    accessEgressPenalty: [PenaltyForStreetMode!] = [{streetMode : car_park, timePenalty : "20m + 2.0 t", costFactor : 1.5}, {streetMode : car_pickup, timePenalty : "20m + 2.0 t", costFactor : 1.5}, {streetMode : car_rental, timePenalty : "20m + 2.0 t", costFactor : 1.5}, {streetMode : flexible, timePenalty : "10m + 1.30 t", costFactor : 1.3}],
+    accessEgressPenalty: [PenaltyForStreetMode!] = [{streetMode : car_park, timePenalty : "20m + 2.0 t", costFactor : 1.5}, {streetMode : car_pickup, timePenalty : "20m + 2.0 t", costFactor : 1.5}, {streetMode : car_rental, timePenalty : "20m + 2.0 t", costFactor : 1.5}, {streetMode : flexible, timePenalty : "10m + 1.30 t", costFactor : 1.3}, {streetMode : demand_responsive_transportation, timePenalty : "20m + 2.0 t", costFactor : 1.5}],
     "The alightSlack is the minimum extra time after exiting a public transport vehicle. This is the default value used, if not overridden by the 'alightSlackList'."
     alightSlackDefault: Int = 0,
     "List of alightSlack for a given set of modes. Defaults: []"
@@ -810,6 +866,8 @@ type QueryType {
     dateTime: DateTime,
     "Debug the itinerary-filter-chain. OTP will attach a system notice to itineraries instead of removing them. This is very convenient when tuning the filters."
     debugItineraryFilter: Boolean = false @deprecated(reason : "Use `itineraryFilter.debug` instead."),
+    "DRT (Demand Responsive Transport) configuration for the trip planning request."
+    drt: DRTInput,
     "A list of filters for which trips should be included. A trip will be included if it matches with at least one filter. An empty list of filters means that all trips should be included. If a search include this parameter, \"whiteListed\", \"banned\" & \"modes.transportModes\" filters will be ignored."
     filters: [TripFilterInput!],
     "The start location"
@@ -1826,6 +1884,8 @@ enum StreetMode {
   car_pickup
   "Walk to a car rental point along the road, drive to a drop-off point along the road, and walk the rest of the way. This can include car rentals at fixed locations or free-floating services."
   car_rental
+  "Using a DRT service (e.g. Shotl) to get to a transit stop or directly to the destination. This can include walking before or after the DRT leg."
+  demand_responsive_transportation
   "Walk to an eligible pickup area for flexible transportation, ride to an eligible drop-off area and then walk the rest of the way."
   flexible
   "Walk only"
@@ -2023,6 +2083,28 @@ scalar Long
 
 "Time using the format: `HH:MM:SS`. Example: `18:25:43`"
 scalar Time
+
+"Input for DRT (Demand Responsive Transport) ride request."
+input DRTInput {
+  "Area ID for the DRT service."
+  areaId: String
+  "Passenger information for the DRT ride."
+  passengers: DRTPassengersInput
+  "Passenger app ID."
+  paxAppId: String
+  "Type of ride requested."
+  rideType: String
+  "User ID for the DRT service."
+  userId: String
+}
+
+"Passenger information for a DRT ride."
+input DRTPassengersInput {
+  "Number of regular passengers."
+  regular: Int
+  "Number of wheelchair passengers."
+  wheelchair: Int
+}
 
 "Filter trips by disallowing lines involving certain elements. If both lines and authorities are specified, only one must be valid for each line to be banned. If a line is both banned and whitelisted, it will be counted as banned."
 input InputBanned {

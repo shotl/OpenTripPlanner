@@ -3395,6 +3395,14 @@ enum PlanAccessMode {
   """
   CAR_RENTAL
   """
+  Demand Responsive Transportation (DRT) such as Shotl. This mode is used for
+  on-demand transportation services that can pick up passengers and take them
+  to transit stops or directly to destinations. Note, this can include walking
+  before or after the DRT leg. Requires the `drt` input parameter to be set
+  with service-specific configuration.
+  """
+  DRT
+  """
   Flexible transit. This can include different forms of flexible transit that
   can be defined in GTFS-Flex or in Netex. Note, this can include walking before
   or after the flexible transit leg.
@@ -3448,6 +3456,14 @@ enum PlanDirectMode {
   car.
   """
   CAR_RENTAL
+  """
+  Demand Responsive Transportation (DRT) such as Shotl. This mode is used for
+  on-demand transportation services that can pick up passengers and take them
+  directly to their destination. Note, this can include walking before or after
+  the DRT leg. Requires the `drt` input parameter to be set with service-specific
+  configuration.
+  """
+  DRT
   """
   Flexible transit. This can include different forms of flexible transit that
   can be defined in GTFS-Flex or in Netex. Note, this can include walking before
@@ -3503,6 +3519,14 @@ enum PlanEgressMode {
   car.
   """
   CAR_RENTAL
+  """
+  Demand Responsive Transportation (DRT) such as Shotl. This mode is used for
+  on-demand transportation services that can pick up passengers from transit
+  stops or other locations and take them to the destination. Note, this can
+  include walking before the DRT leg. Requires the `drt` input parameter to be
+  set with service-specific configuration.
+  """
+  DRT
   """
   Flexible transit. This can include different forms of flexible transit that
   can be defined in GTFS-Flex or in Netex. Note, this can include walking before

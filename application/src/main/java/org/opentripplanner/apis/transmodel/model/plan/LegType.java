@@ -407,6 +407,23 @@ public class LegType {
       )
       .field(
         GraphQLFieldDefinition.newFieldDefinition()
+          .name("drtEstimate")
+          .description("Estimate of a DRT ride (e.g. Shotl). Only present for DRT legs.")
+          .type(DRTEstimateType.OUTPUT_TYPE)
+          .dataFetcher(env -> {
+            Leg l = leg(env);
+            if (
+              l instanceof
+              org.opentripplanner.ext.demandresponsivetransportation.model.DRTLeg drtLeg
+            ) {
+              return drtLeg.rideEstimate();
+            }
+            return null;
+          })
+          .build()
+      )
+      .field(
+        GraphQLFieldDefinition.newFieldDefinition()
           .description(ElevationProfileStepType.makeDescription("leg"))
           .name("elevationProfile")
           .type(new GraphQLNonNull(new GraphQLList(elevationStepType)))

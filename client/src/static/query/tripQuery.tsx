@@ -16,6 +16,7 @@ query trip(
   $boardSlackList: [TransportModeSlack]
   $bookingTime: DateTime
   $dateTime: DateTime
+  $drt: DRTInput
   $filters: [TripFilterInput!]
   $from: Location!
   $ignoreRealtimeUpdates: Boolean
@@ -57,6 +58,7 @@ query trip(
     boardSlackList: $boardSlackList
     bookingTime: $bookingTime
     dateTime: $dateTime
+    drt: $drt
     filters: $filters
     from: $from
     ignoreRealtimeUpdates: $ignoreRealtimeUpdates

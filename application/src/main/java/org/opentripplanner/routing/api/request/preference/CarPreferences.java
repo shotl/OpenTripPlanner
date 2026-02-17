@@ -33,7 +33,7 @@ public final class CarPreferences implements Serializable {
 
   /** Create a new instance with default values. */
   private CarPreferences() {
-    this.reluctance = 2.0;
+    this.reluctance = 1.0;
     this.boardCost = Cost.costOfMinutes(10);
     this.parking = VehicleParkingPreferences.DEFAULT;
     this.rental = VehicleRentalPreferences.DEFAULT;

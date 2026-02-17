@@ -128,11 +128,11 @@ public class CarParkAndRideTest extends ParkAndRideTest {
       B,
       StreetMode.CAR_TO_PARK,
       "null - null (0.00, 0)",
-      "CAR - AB street (15.54, 8)",
-      "null - CarPark #1 Entrance B (16.54, 8)",
-      "null (parked) - CarPark #1 Entrance A (256.54, 188)",
-      "null (parked) - CarPark #1 Entrance A (257.54, 188)",
-      "WALK (parked) - AB street (388.36, 254)"
+      "CAR - AB street (7.77, 8)",
+      "null - CarPark #1 Entrance B (8.77, 8)",
+      "null (parked) - CarPark #1 Entrance A (248.77, 188)",
+      "null (parked) - CarPark #1 Entrance A (249.77, 188)",
+      "WALK (parked) - AB street (380.59, 254)"
     );
   }
 

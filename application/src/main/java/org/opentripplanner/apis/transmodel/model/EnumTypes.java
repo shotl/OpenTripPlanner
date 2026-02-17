@@ -427,6 +427,12 @@ public class EnumTypes {
       "flexible transportation, ride to an eligible drop-off area and then walk the rest of " +
       "the way."
     )
+    .value(
+      "demand_responsive_transportation",
+      StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION,
+      "Using a DRT service (e.g. Shotl) to get to a transit stop or directly to the destination. " +
+      "This can include walking before or after the DRT leg."
+    )
     .build();
 
   public static final GraphQLEnumType TRANSPORT_MODE = GraphQLEnumType.newEnum()

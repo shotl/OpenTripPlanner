@@ -24,7 +24,9 @@ const getColorForMode = function (mode: Mode) {
  * Extract a line color from a leg. If there isn't one given by its line, this method returns a fallback color.
  */
 export const getColorForLeg = function (leg: Leg) {
-  if (leg.line?.presentation?.colour) {
+  if (leg.drtEstimate) {
+    return '#2E86C1';
+  } else if (leg.line?.presentation?.colour) {
     return `#${leg.line.presentation.colour}`;
   } else {
     return getColorForMode(leg.mode);

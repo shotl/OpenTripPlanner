@@ -43,6 +43,38 @@ export function ItineraryLegDetails({ leg, isLast }: { leg: Leg; isLast: boolean
         )}{' '}
         {!isLast && <ItineraryGraphiQLQuayLink legId={leg.toPlace.quay?.id} legName={leg.toPlace.name} />}
       </div>
+      {leg.drtEstimate && (
+        <div
+          className="drt-estimate"
+          style={{
+            marginTop: '4px',
+            padding: '4px 8px',
+            background: '#f0f7ff',
+            borderRadius: '4px',
+            fontSize: '0.85em',
+          }}
+        >
+          <b>DRT Estimate</b> (Code: {leg.drtEstimate.code}, Status: {leg.drtEstimate.status})
+          <br />
+          Pickup: {leg.drtEstimate.scheduledPickupPlace.name || 'N/A'} at{' '}
+          {leg.drtEstimate.userExpectedPickupTime
+            ? new Date(Number(leg.drtEstimate.userExpectedPickupTime) * 1000).toLocaleTimeString()
+            : 'N/A'}
+          <br />
+          Dropoff: {leg.drtEstimate.scheduledDropoffPlace.name || 'N/A'} at{' '}
+          {leg.drtEstimate.userExpectedDropoffTime
+            ? new Date(Number(leg.drtEstimate.userExpectedDropoffTime) * 1000).toLocaleTimeString()
+            : 'N/A'}
+          {leg.drtEstimate.vehicleId && (
+            <>
+              <br />
+              Vehicle: {leg.drtEstimate.vehicleId}
+            </>
+          )}
+          <br />
+          Passengers: {leg.drtEstimate.passengers.regular} regular, {leg.drtEstimate.passengers.wheelchair} wheelchair
+        </div>
+      )}
     </div>
   );
 }

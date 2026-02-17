@@ -253,16 +253,33 @@ public class State implements AStarState<State, Edge, Vertex>, Cloneable {
     boolean parkAndRide = request.mode().includesParking();
     boolean vehicleRentingOk;
     boolean vehicleParkAndRideOk;
+    boolean carPickupOk;
     if (request.arriveBy()) {
       vehicleRentingOk = !request.mode().includesRenting() || !isRentingVehicle();
       vehicleParkAndRideOk = !parkAndRide || !isVehicleParked();
+      // For arrive-by searches with pickup modes (DRT, CAR_PICKUP, CAR_HAILING):
+      // The reverse search starts at destination and needs to find a pickup point.
+      // Final states must be in WALK_TO_PICKUP (waiting for pickup) or IN_CAR (in vehicle).
+      // WALK_FROM_DROP_OFF means we haven't been picked up yet in the reverse direction.
+      carPickupOk =
+        !request.mode().includesPickup() ||
+        stateData.carPickupState == CarPickupState.WALK_TO_PICKUP ||
+        stateData.carPickupState == CarPickupState.IN_CAR;
     } else {
       vehicleRentingOk =
         !request.mode().includesRenting() ||
         (vehicleRentalNotStarted() || vehicleRentalIsFinished());
       vehicleParkAndRideOk = !parkAndRide || isVehicleParked();
+      // For depart-at searches with pickup modes (DRT, CAR_PICKUP, CAR_HAILING):
+      // A trip using DRT/CAR_PICKUP must have completed the pickup phase to be final.
+      // Final states must be in WALK_FROM_DROP_OFF (dropped off) or IN_CAR (still in vehicle at destination).
+      // WALK_TO_PICKUP means we're still waiting for pickup, not a valid final state.
+      carPickupOk =
+        !request.mode().includesPickup() ||
+        stateData.carPickupState == CarPickupState.WALK_FROM_DROP_OFF ||
+        stateData.carPickupState == CarPickupState.IN_CAR;
     }
-    return vehicleRentingOk && vehicleParkAndRideOk;
+    return vehicleRentingOk && vehicleParkAndRideOk && carPickupOk;
   }
 
   public RentalFormFactor vehicleRentalFormFactor() {
