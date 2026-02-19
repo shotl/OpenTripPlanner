@@ -422,12 +422,12 @@ public class StreetIndex {
     if (onlyCarAvailable || parkAndRideDepart || carPickupMode) {
       nonTransitMode = TraverseMode.CAR;
     }
-    LOG.info(
-      "[DRT-DEBUG] getTraverseModeForLinker: streetMode={}, endVertex={}, result={}",
-      streetMode,
-      endVertex,
-      nonTransitMode
-    );
+    // LOG.info(
+    //   "[DRT-DEBUG] getTraverseModeForLinker: streetMode={}, endVertex={}, result={}",
+    //   streetMode,
+    //   endVertex,
+    //   nonTransitMode
+    // );
     return nonTransitMode;
   }
 

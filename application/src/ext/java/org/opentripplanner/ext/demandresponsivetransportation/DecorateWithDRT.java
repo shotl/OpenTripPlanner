@@ -1,8 +1,6 @@
 package org.opentripplanner.ext.demandresponsivetransportation;
 
-import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import org.opentripplanner.ext.demandresponsivetransportation.model.DRTLeg;
 import org.opentripplanner.model.SystemNotice;
 import org.opentripplanner.model.plan.Itinerary;
@@ -68,39 +66,29 @@ public class DecorateWithDRT implements ItineraryListFilter {
     Leg leg,
     DemandResponsiveTransportationService service
   ) {
-    try {
-      if (leg instanceof StreetLeg sl && sl.getMode().isInCar()) {
-        LOG.info("decorating leg with DRT estimate");
+    if (leg instanceof StreetLeg sl && sl.getMode().isInCar()) {
+      LOG.info("decorating leg with DRT estimate");
 
-        var drtEstimationResponse = service.arrivalTimes(
-          request.demandResponsiveExtData().paxAppId(),
-          request.demandResponsiveExtData().areaId(),
-          request.demandResponsiveExtData().userId(),
-          request.demandResponsiveExtData().rideType(),
-          leg.getFrom().coordinate,
-          leg.getTo().coordinate,
-          request.demandResponsiveExtData().passengers().regular(),
-          request.demandResponsiveExtData().passengers().wheelchair(),
-          leg.getStartTime().toInstant(),
-          DrtRequestContext.LEG_DECORATING
-        );
-        if (drtEstimationResponse == null) {
-          LOG.warn("No DRT estimate available for leg: {}", leg);
-          flagForDeletion(i);
-          return leg;
-        }
-
-        return new DRTLeg(sl, drtEstimationResponse);
-      } else {
+      var drtEstimationResponse = service.arrivalTimes(
+        request.demandResponsiveExtData().paxAppId(),
+        request.demandResponsiveExtData().areaId(),
+        request.demandResponsiveExtData().userId(),
+        request.demandResponsiveExtData().rideType(),
+        leg.getFrom().coordinate,
+        leg.getTo().coordinate,
+        request.demandResponsiveExtData().passengers().regular(),
+        request.demandResponsiveExtData().passengers().wheelchair(),
+        leg.getStartTime().toInstant(),
+        DrtRequestContext.LEG_DECORATING
+      );
+      if (drtEstimationResponse == null) {
+        LOG.warn("No DRT estimate available for leg: {}", leg);
+        flagForDeletion(i);
         return leg;
       }
-    } catch (ExecutionException e) {
-      LOG.error("Could not get DRT estimate for Shotl", e);
-      flagForDeletion(i);
-      return leg;
-    } catch (IOException e) {
-      LOG.error("Could not get DRT estimate for Shotl", e);
-      flagForDeletion(i);
+
+      return new DRTLeg(sl, drtEstimationResponse);
+    } else {
       return leg;
     }
   }

@@ -145,31 +145,31 @@ public class StateData implements Cloneable {
     //   - WALK / WALK_FROM_DROP_OFF or WALK_TO_PICKUP for cases with an initial walk
     // For forward/reverse searches to be symmetric both initial states need to be created.
     if (requestMode.includesPickup()) {
-      LOG.info(
-        "[DRT-DEBUG] StateData.getInitialStateDatas: creating pickup states for mode={}, arriveBy={}",
-        requestMode,
-        arriveBy
-      );
+      // LOG.info(
+      //   "[DRT-DEBUG] StateData.getInitialStateDatas: creating pickup states for mode={}, arriveBy={}",
+      //   requestMode,
+      //   arriveBy
+      // );
       var inCarPickupStateData = proto.clone();
       inCarPickupStateData.carPickupState = CarPickupState.IN_CAR;
       inCarPickupStateData.currentMode = TraverseMode.CAR;
       res.add(inCarPickupStateData);
-      LOG.info(
-        "[DRT-DEBUG] Created IN_CAR state: carPickupState={}, currentMode={}",
-        inCarPickupStateData.carPickupState,
-        inCarPickupStateData.currentMode
-      );
+      // LOG.info(
+      //   "[DRT-DEBUG] Created IN_CAR state: carPickupState={}, currentMode={}",
+      //   inCarPickupStateData.carPickupState,
+      //   inCarPickupStateData.currentMode
+      // );
       var walkingPickupStateData = proto.clone();
       walkingPickupStateData.carPickupState = arriveBy
         ? CarPickupState.WALK_FROM_DROP_OFF
         : CarPickupState.WALK_TO_PICKUP;
       walkingPickupStateData.currentMode = TraverseMode.WALK;
       res.add(walkingPickupStateData);
-      LOG.info(
-        "[DRT-DEBUG] Created WALK state: carPickupState={}, currentMode={}",
-        walkingPickupStateData.carPickupState,
-        walkingPickupStateData.currentMode
-      );
+      // LOG.info(
+      //   "[DRT-DEBUG] Created WALK state: carPickupState={}, currentMode={}",
+      //   walkingPickupStateData.carPickupState,
+      //   walkingPickupStateData.currentMode
+      // );
     }
     // Vehicle rental searches may end in four states (see State#isFinal()):
     // When searching forward:

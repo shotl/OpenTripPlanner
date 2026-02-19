@@ -1,8 +1,6 @@
 package org.opentripplanner.ext.demandresponsivetransportation;
 
-import java.io.IOException;
 import java.time.Instant;
-import java.util.concurrent.ExecutionException;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
 
@@ -35,5 +33,5 @@ public interface DemandResponsiveTransportationService {
     int wheelchairPassengers,
     Instant desiredPickupTime,
     DrtRequestContext context
-  ) throws ExecutionException, IOException;
+  );
 }

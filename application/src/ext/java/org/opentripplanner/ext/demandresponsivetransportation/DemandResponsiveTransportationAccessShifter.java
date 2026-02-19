@@ -1,11 +1,9 @@
 package org.opentripplanner.ext.demandresponsivetransportation;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.RoutingAccessEgress;
@@ -39,14 +37,24 @@ public class DemandResponsiveTransportationAccessShifter {
     return results
       .stream()
       .map(ae -> {
-        // only time-shift access legs on a car
-        // (there could be walk-only accesses if you're close to the stop)
-        if (isAccess && ae.getLastState().containsModeCar()) {
-          var duration = fetchArrivalDelay(services, request, now);
-          if (duration.isSuccess()) {
-            return new DemandResponsiveTransportationAccessAdapter(ae, duration.successValue());
+        // Only process car-based legs (walk-only accesses/egresses pass through unchanged)
+        if (ae.getLastState().containsModeCar()) {
+          if (isAccess) {
+            // Time-shift access legs based on DRT vehicle arrival delay
+            var duration = fetchArrivalDelay(services, request, now);
+            if (duration.isSuccess()) {
+              return new DemandResponsiveTransportationAccessAdapter(ae, duration.successValue());
+            } else {
+              return null;
+            }
           } else {
-            return null;
+            // For egress, verify DRT service is reachable; filter out if not
+            var duration = fetchArrivalDelay(services, request, now);
+            if (duration.isSuccess()) {
+              return ae;
+            } else {
+              return null;
+            }
           }
         } else {
           return ae;
@@ -121,55 +129,49 @@ public class DemandResponsiveTransportationAccessShifter {
       return Result.failure(Error.NO_ARRIVAL_FOR_LOCATION);
     }
 
-    try {
-      var service = services.get(0);
+    var service = services.get(0);
 
-      // Use the user's requested departure time, not "now"
-      Instant desiredPickupTime = req.dateTime();
+    // Use the user's requested departure time, not "now"
+    Instant desiredPickupTime = req.dateTime();
 
-      LOG.info("shifting access for DRT, desired pickup time: {}", desiredPickupTime);
+    LOG.info("shifting access for DRT, desired pickup time: {}", desiredPickupTime);
 
-      var drtEstimationResponse = service.arrivalTimes(
-        req.demandResponsiveExtData().paxAppId(),
-        req.demandResponsiveExtData().areaId(),
-        req.demandResponsiveExtData().userId(),
-        req.demandResponsiveExtData().rideType(),
-        new WgsCoordinate(req.from().getCoordinate()),
-        new WgsCoordinate(req.to().getCoordinate()),
-        req.demandResponsiveExtData().passengers().regular(),
-        req.demandResponsiveExtData().passengers().wheelchair(),
-        desiredPickupTime,
-        DrtRequestContext.ACCESS_SHIFTING
-      );
-      if (drtEstimationResponse == null) {
-        return Result.failure(Error.NO_ARRIVAL_FOR_LOCATION);
-      }
-
-      Instant userExpectedPickupTime = Instant.ofEpochSecond(
-        drtEstimationResponse.user_expected_pickup_time()
-      );
-
-      // Calculate how much later than requested the actual pickup will be
-      Duration totalDelay = Duration.between(desiredPickupTime, userExpectedPickupTime);
-
-      // Ensure the delay is not negative
-      if (totalDelay.isNegative()) {
-        totalDelay = Duration.ZERO;
-      }
-
-      LOG.info(
-        "DRT time shift: requested={}, expected={}, delay={}",
-        desiredPickupTime,
-        userExpectedPickupTime,
-        totalDelay
-      );
-
-      return Result.success(totalDelay);
-    } catch (ExecutionException e) {
-      return Result.failure(Error.TECHNICAL_ERROR);
-    } catch (IOException e) {
-      return Result.failure(Error.TECHNICAL_ERROR);
+    var drtEstimationResponse = service.arrivalTimes(
+      req.demandResponsiveExtData().paxAppId(),
+      req.demandResponsiveExtData().areaId(),
+      req.demandResponsiveExtData().userId(),
+      req.demandResponsiveExtData().rideType(),
+      new WgsCoordinate(req.from().getCoordinate()),
+      new WgsCoordinate(req.to().getCoordinate()),
+      req.demandResponsiveExtData().passengers().regular(),
+      req.demandResponsiveExtData().passengers().wheelchair(),
+      desiredPickupTime,
+      DrtRequestContext.ACCESS_SHIFTING
+    );
+    if (drtEstimationResponse == null) {
+      return Result.failure(Error.NO_ARRIVAL_FOR_LOCATION);
     }
+
+    Instant userExpectedPickupTime = Instant.ofEpochSecond(
+      drtEstimationResponse.user_expected_pickup_time()
+    );
+
+    // Calculate how much later than requested the actual pickup will be
+    Duration totalDelay = Duration.between(desiredPickupTime, userExpectedPickupTime);
+
+    // Ensure the delay is not negative
+    if (totalDelay.isNegative()) {
+      totalDelay = Duration.ZERO;
+    }
+
+    LOG.info(
+      "DRT time shift: requested={}, expected={}, delay={}",
+      desiredPickupTime,
+      userExpectedPickupTime,
+      totalDelay
+    );
+
+    return Result.success(totalDelay);
   }
 
   enum Error {

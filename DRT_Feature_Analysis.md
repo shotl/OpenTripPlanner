@@ -347,7 +347,7 @@ if (totalDelay.isNegative()) {
 
 **Request:**
 ```java
-POST {baseUrl}/drt/time-estimations
+POST {baseUrl}/v3/drt/time-estimations
 Headers:
   - Content-Type: application/json
   - Shotl-Passenger-App-Id: {paxAppId}

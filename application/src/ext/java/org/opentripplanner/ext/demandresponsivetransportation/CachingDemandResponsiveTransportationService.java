@@ -2,10 +2,8 @@ package org.opentripplanner.ext.demandresponsivetransportation;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.concurrent.ExecutionException;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlBusinessRejectionException;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
@@ -50,7 +48,7 @@ public abstract class CachingDemandResponsiveTransportationService
     int wheelchairPassengers,
     Instant desiredPickupTime,
     DrtRequestContext context
-  ) throws ExecutionException, IOException {
+  ) {
     var cacheKey = DrtEstimateRequest.create(
       areaId,
       rideType,
@@ -119,11 +117,14 @@ public abstract class CachingDemandResponsiveTransportationService
       );
 
       return response;
-    } catch (ExecutionException e) {
-      // Business rejections (e.g. OUT_OF_SERVICE_HOURS, NO_ONLINE_VEHICLES) are expected
-      // scenarios — log at warn and return null so callers can gracefully discard this result
-      // without failing the entire GraphQL request.
-      if (e.getCause() instanceof ShotlBusinessRejectionException rejection) {
+    } catch (Exception e) {
+      // All errors are handled gracefully — return null so callers can skip this leg
+      // without failing the entire routing request.
+      // Note: Guava Cache.get() wraps checked exceptions in ExecutionException and
+      // unchecked exceptions (RuntimeException) in UncheckedExecutionException, so we
+      // catch Exception to handle both cases.
+      var cause = e.getCause();
+      if (cause instanceof ShotlBusinessRejectionException rejection) {
         LOG.warn(
           "[DRT] API BUSINESS REJECTION | context={} | areaId={} | code={} | message={}",
           context,
@@ -131,19 +132,15 @@ public abstract class CachingDemandResponsiveTransportationService
           rejection.getCode(),
           rejection.getMessage()
         );
-        return null;
+      } else {
+        LOG.error(
+          "[DRT] API ERROR | context={} | areaId={} | error={}",
+          context,
+          areaId,
+          e.getMessage()
+        );
       }
-      LOG.error(
-        "[DRT] API ERROR | context={} | areaId={} | error={}",
-        context,
-        areaId,
-        e.getMessage()
-      );
-      // Unwrap IOException if it was the underlying cause
-      if (e.getCause() instanceof IOException ioException) {
-        throw ioException;
-      }
-      throw e;
+      return null;
     }
   }
 
@@ -163,5 +160,5 @@ public abstract class CachingDemandResponsiveTransportationService
     int wheelchairPassengers,
     Instant desiredPickupTime,
     DrtRequestContext context
-  ) throws IOException;
+  );
 }

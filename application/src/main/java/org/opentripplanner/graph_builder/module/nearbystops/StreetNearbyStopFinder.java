@@ -141,12 +141,12 @@ public class StreetNearbyStopFinder implements NearbyStopFinder {
 
     ShortestPathTree<State, Edge, Vertex> spt = streetSearch.getShortestPathTree();
 
-    LOG.info(
-      "[DRT-DEBUG] StreetNearbyStopFinder: streetRequest.mode={}, reverseDirection={}, originVertices={}",
-      streetRequest.mode(),
-      reverseDirection,
-      originVertices.size()
-    );
+    // LOG.info(
+    //   "[DRT-DEBUG] StreetNearbyStopFinder: streetRequest.mode={}, reverseDirection={}, originVertices={}",
+    //   streetRequest.mode(),
+    //   reverseDirection,
+    //   originVertices.size()
+    // );
 
     // Only used if OTPFeature.FlexRouting.isOn()
     Multimap<AreaStop, State> locationsMap = ArrayListMultimap.create();
@@ -164,21 +164,21 @@ public class StreetNearbyStopFinder implements NearbyStopFinder {
           transitStopCount++;
           if (state.isFinal()) {
             transitStopFinalCount++;
-            LOG.debug(
-              "[DRT-DEBUG] Found transit stop: stop={}, containsCar={}, carPickupState={}, currentMode={}",
-              tsv.getStop(),
-              state.containsModeCar(),
-              state.getCarPickupState(),
-              state.currentMode()
-            );
+            // LOG.debug(
+            //   "[DRT-DEBUG] Found transit stop: stop={}, containsCar={}, carPickupState={}, currentMode={}",
+            //   tsv.getStop(),
+            //   state.containsModeCar(),
+            //   state.getCarPickupState(),
+            //   state.currentMode()
+            // );
             stopsFound.add(NearbyStop.nearbyStopForState(state, tsv.getStop()));
           } else {
-            LOG.debug(
-              "[DRT-DEBUG] Transit stop NOT final: stop={}, carPickupState={}, currentMode={}",
-              tsv.getStop(),
-              state.getCarPickupState(),
-              state.currentMode()
-            );
+            // LOG.debug(
+            //   "[DRT-DEBUG] Transit stop NOT final: stop={}, carPickupState={}, currentMode={}",
+            //   tsv.getStop(),
+            //   state.getCarPickupState(),
+            //   state.currentMode()
+            // );
           }
         }
         if (
@@ -196,12 +196,12 @@ public class StreetNearbyStopFinder implements NearbyStopFinder {
           }
         }
       }
-      LOG.info(
-        "[DRT-DEBUG] StreetNearbyStopFinder summary: transitStopsReached={}, transitStopsFinal={}, stopsFound={}",
-        transitStopCount,
-        transitStopFinalCount,
-        stopsFound.size()
-      );
+      //  LOG.info(
+      //   "[DRT-DEBUG] StreetNearbyStopFinder summary: transitStopsReached={}, transitStopsFinal={}, stopsFound={}",
+      //   transitStopCount,
+      //   transitStopFinalCount,
+      //   stopsFound.size()
+      // );
     }
 
     if (OTPFeature.FlexRouting.isOn()) {

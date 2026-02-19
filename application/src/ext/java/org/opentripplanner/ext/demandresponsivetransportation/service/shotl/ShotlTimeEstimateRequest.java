@@ -2,6 +2,7 @@ package org.opentripplanner.ext.demandresponsivetransportation.service.shotl;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 
 /**
  * Request model for Shotl DRT time estimation API
@@ -32,6 +33,9 @@ public class ShotlTimeEstimateRequest {
 
   @JsonProperty("desired_dropoff_time")
   private Long desiredDropoffTime;
+
+  @JsonProperty("passenger_fare_type")
+  private List<PassengerFareTypeInput> passengerFareType;
 
   public ShotlTimeEstimateRequest() {}
 
@@ -118,6 +122,49 @@ public class ShotlTimeEstimateRequest {
 
   public void setDesiredDropoffTime(Long desiredDropoffTime) {
     this.desiredDropoffTime = desiredDropoffTime;
+  }
+
+  public List<PassengerFareTypeInput> getPassengerFareType() {
+    return passengerFareType;
+  }
+
+  public void setPassengerFareType(List<PassengerFareTypeInput> passengerFareType) {
+    this.passengerFareType = passengerFareType;
+  }
+
+  /**
+   * Passenger fare type input for pricing
+   */
+  public static class PassengerFareTypeInput {
+
+    @JsonProperty("type")
+    private String type;
+
+    @JsonProperty("count")
+    private int count;
+
+    public PassengerFareTypeInput() {}
+
+    public PassengerFareTypeInput(String type, int count) {
+      this.type = type;
+      this.count = count;
+    }
+
+    public String getType() {
+      return type;
+    }
+
+    public void setType(String type) {
+      this.type = type;
+    }
+
+    public int getCount() {
+      return count;
+    }
+
+    public void setCount(int count) {
+      this.count = count;
+    }
   }
 
   /**

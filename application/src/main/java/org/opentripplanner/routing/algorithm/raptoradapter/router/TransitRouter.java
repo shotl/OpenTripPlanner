@@ -257,7 +257,7 @@ public class TransitRouter {
     var streetRequest = type.isAccess() ? request.journey().access() : request.journey().egress();
     StreetMode mode = streetRequest.mode();
 
-    LOG.info("[DRT-DEBUG] fetchAccessEgresses: type={}, mode={}", type, mode);
+    // LOG.info("[DRT-DEBUG] fetchAccessEgresses: type={}, mode={}", type, mode);
 
     // Prepare access/egress lists
     RouteRequest accessRequest = request.clone();
@@ -289,39 +289,61 @@ public class TransitRouter {
       stopCountLimit
     );
 
-    LOG.info(
-      "[DRT-DEBUG] nearbyStops found: count={}, durationLimit={}, stopCountLimit={}",
-      nearbyStops.size(),
-      durationLimit,
-      stopCountLimit
-    );
-    for (var stop : nearbyStops) {
-      LOG.info(
-        "[DRT-DEBUG] nearbyStop: stop={}, containsCar={}, isFinal={}, carPickupState={}, currentMode={}",
-        stop.stop,
-        stop.state.containsModeCar(),
-        stop.state.isFinal(),
-        stop.state.getCarPickupState(),
-        stop.state.currentMode()
-      );
-    }
+    // LOG.info(
+    //   "[DRT-DEBUG] nearbyStops found: count={}, durationLimit={}, stopCountLimit={}",
+    //   nearbyStops.size(),
+    //   durationLimit,
+    //   stopCountLimit
+    // );
+    // for (var stop : nearbyStops) {
+    //   LOG.info(
+    //     "[DRT-DEBUG] nearbyStop: stop={}, containsCar={}, isFinal={}, carPickupState={}, currentMode={}",
+    //     stop.stop,
+    //     stop.state.containsModeCar(),
+    //     stop.state.isFinal(),
+    //     stop.state.getCarPickupState(),
+    //     stop.state.currentMode()
+    //   );
+    // }
 
     var accessEgresses = AccessEgressMapper.mapNearbyStops(nearbyStops, type);
 
-    LOG.info("[DRT-DEBUG] accessEgresses after mapping: count={}", accessEgresses.size());
-    for (var ae : accessEgresses) {
-      LOG.info(
-        "[DRT-DEBUG] accessEgress: containsModeCar={}, durationInSeconds={}",
-        ae.getLastState().containsModeCar(),
-        ae.durationInSeconds()
-      );
-    }
+    // LOG.info("[DRT-DEBUG] accessEgresses after mapping: count={}", accessEgresses.size());
+    // for (var ae : accessEgresses) {
+    //   LOG.info(
+    //     "[DRT-DEBUG] accessEgress: containsModeCar={}, durationInSeconds={}",
+    //     ae.getLastState().containsModeCar(),
+    //     ae.durationInSeconds()
+    //   );
+    // }
 
     accessEgresses = timeshiftRideHailing(streetRequest, type, accessEgresses);
 
-    LOG.info("[DRT-DEBUG] accessEgresses after timeshifting: count={}", accessEgresses.size());
+    // LOG.info("[DRT-DEBUG] accessEgresses after timeshifting: count={}", accessEgresses.size());
 
     var results = new ArrayList<>(accessEgresses);
+
+    // When mode is DRT, also find walk-accessible stops so that walk+transit
+    // itineraries are available as fallback (or as better options for nearby stops).
+    if (mode == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION) {
+      var walkStreetRequest = new StreetRequest(StreetMode.WALK);
+      Duration walkDurationLimit = accessEgressPreferences.maxDuration().valueOf(StreetMode.WALK);
+      int walkStopCountLimit = accessEgressPreferences
+        .maxStopCountLimit()
+        .limitForMode(StreetMode.WALK);
+
+      var walkNearbyStops = AccessEgressRouter.findAccessEgresses(
+        accessRequest,
+        temporaryVerticesContainer,
+        walkStreetRequest,
+        serverContext.dataOverlayContext(accessRequest),
+        type,
+        walkDurationLimit,
+        walkStopCountLimit
+      );
+
+      results.addAll(AccessEgressMapper.mapNearbyStops(walkNearbyStops, type));
+    }
 
     // Special handling of flex accesses
     if (OTPFeature.FlexRouting.isOn() && mode == StreetMode.FLEXIBLE) {

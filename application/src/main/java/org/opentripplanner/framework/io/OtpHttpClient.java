@@ -82,11 +82,11 @@ public class OtpHttpClient {
       requestHeaderValues,
       response -> {
         if (isFailedRequest(response)) {
-          logResponse(response);
           log.warn(
-            "Headers of resource {} unavailable. HTTP error code {}",
+            "Headers of resource {} unavailable. HTTP error code {}: {}",
             sanitizeUri(uri),
-            response.getCode()
+            response.getCode(),
+            readResponseBody(response)
           );
 
           return Collections.emptyList();
@@ -307,9 +307,9 @@ public class OtpHttpClient {
 
   private <T> T mapResponse(ClassicHttpResponse response, ResponseMapper<T> contentMapper) {
     if (isFailedRequest(response)) {
-      logResponse(response);
+      String responseBody = readResponseBody(response);
       throw new OtpHttpClientException(
-        "HTTP request failed with status code " + response.getCode()
+        "HTTP request failed with status code " + response.getCode() + ": " + responseBody
       );
     }
     if (response.getEntity() == null) {
@@ -377,22 +377,17 @@ public class OtpHttpClient {
     return uri.toString().replace('?' + uri.getQuery(), "");
   }
 
-  private void logResponse(ClassicHttpResponse response) {
+  private String readResponseBody(ClassicHttpResponse response) {
     try {
-      if (
-        log.isTraceEnabled() &&
-        response.getEntity() != null &&
-        response.getEntity().getContent() != null
-      ) {
-        var entity = response.getEntity();
-        String content = new BufferedReader(new InputStreamReader(entity.getContent()))
+      if (response.getEntity() != null && response.getEntity().getContent() != null) {
+        return new BufferedReader(new InputStreamReader(response.getEntity().getContent()))
           .lines()
           .collect(Collectors.joining("\n"));
-        log.trace("HTTP request failed with status code {}: \n{}", response.getCode(), content);
       }
     } catch (Exception e) {
-      log.debug(e.getMessage());
+      log.debug("Failed to read error response body: {}", e.getMessage());
     }
+    return "<empty>";
   }
 
   @FunctionalInterface

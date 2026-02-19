@@ -6,7 +6,6 @@ import static java.util.Map.entry;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.ws.rs.core.UriBuilder;
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -26,7 +25,7 @@ import org.slf4j.LoggerFactory;
 public class ShotlService extends CachingDemandResponsiveTransportationService {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShotlService.class);
-  private static final String DEFAULT_TIME_ESTIMATE_PATH = "drt/time-estimations";
+  private static final String DEFAULT_TIME_ESTIMATE_PATH = "v3/drt/time-estimations";
   private static final ObjectMapper MAPPER = ObjectMappers.ignoringExtraFields();
 
   private final String timeEstimateUri;
@@ -55,7 +54,7 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
     int wheelchairPassengers,
     Instant desiredPickupTime,
     DrtRequestContext context
-  ) throws IOException {
+  ) {
     var uri = UriBuilder.fromUri(timeEstimateUri).build();
 
     // Create the request body
@@ -107,31 +106,46 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
 
     LOG.debug("[DRT] API REQUEST BODY | context={} | body={}", context, jsonBody);
 
-    ShotlApiResponse apiResponse = otpHttpClient.postJsonAndMap(
-      uri,
-      jsonBody,
-      Duration.ofSeconds(60),
-      headers(paxAppId),
-      is -> {
-        try {
-          return MAPPER.readValue(is, ShotlApiResponse.class);
-        } catch (Exception e) {
-          LOG.error("[DRT] API PARSE ERROR | context={} | error={}", context, e.getMessage(), e);
-          throw new RuntimeException("Failed to parse Shotl API response", e);
+    ShotlApiResponse apiResponse;
+    try {
+      apiResponse = otpHttpClient.postJsonAndMap(
+        uri,
+        jsonBody,
+        Duration.ofSeconds(60),
+        headers(paxAppId),
+        is -> {
+          try {
+            return MAPPER.readValue(is, ShotlApiResponse.class);
+          } catch (Exception e) {
+            LOG.error("[DRT] API PARSE ERROR | context={} | error={}", context, e.getMessage(), e);
+            throw new RuntimeException("Failed to parse Shotl API response", e);
+          }
         }
-      }
-    );
+      );
+    } catch (Exception e) {
+      LOG.error(
+        "[DRT] API HTTP ERROR | context={} | areaId={} | url={} | request={} | error={}",
+        context,
+        areaId,
+        uri,
+        jsonBody,
+        e.getMessage()
+      );
+      throw e;
+    }
 
     if (!apiResponse.success()) {
       var reason = apiResponse.reason();
       LOG.warn(
-        "[DRT] API REJECTION | context={} | areaId={} | code={} | message={} | displayMessage={} | details={}",
+        "[DRT] API REJECTION | context={} | areaId={} | code={} | message={} | displayMessage={} | details={} | request={} | response={}",
         context,
         areaId,
         reason != null ? reason.code() : "unknown",
         reason != null ? reason.message() : "unknown",
         reason != null ? reason.displayMessage() : null,
-        reason != null ? reason.details() : null
+        reason != null ? reason.details() : null,
+        jsonBody,
+        apiResponse
       );
       throw new ShotlBusinessRejectionException(reason);
     }
@@ -152,7 +166,7 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
     return convertToArrivalEstimateResponse(data);
   }
 
-  private Map<String, String> headers(String paxAppId) throws IOException {
+  private Map<String, String> headers(String paxAppId) {
     return Map.ofEntries(
       entry(ACCEPT_LANGUAGE, "en_US"),
       entry(CONTENT_TYPE, "application/json"),
