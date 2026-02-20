@@ -14,7 +14,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Utility method to shift the start of the journey to the earliest time that a vehicle can arrive.
+ * Utility method to shift the start of the journey and adjust access/egress duration based on
+ * actual DRT travel times from the service API.
  */
 public class DemandResponsiveTransportationAccessShifter {
 
@@ -23,9 +24,11 @@ public class DemandResponsiveTransportationAccessShifter {
   );
 
   /**
-   * Given a list of {@link RoutingAccessEgress}, shift the access ones that contain driving
-   * so that they only start at the time when the ride hailing vehicle can actually be there
-   * to pick up passengers.
+   * Given a list of {@link RoutingAccessEgress}, shift the ones that contain driving
+   * so that they use actual DRT travel times instead of car-based durations.
+   * <p>
+   * For access: calls Shotl with origin → stop coordinates, shifts pickup time and duration.
+   * For egress: calls Shotl with stop → destination coordinates, adjusts duration.
    */
   public static List<RoutingAccessEgress> shiftAccesses(
     boolean isAccess,
@@ -34,96 +37,98 @@ public class DemandResponsiveTransportationAccessShifter {
     RouteRequest request,
     Instant now
   ) {
+    if (!shouldShift(request, Instant.now())) {
+      return results;
+    }
+
     return results
-      .stream()
+      .parallelStream()
       .map(ae -> {
-        // Only process car-based legs (walk-only accesses/egresses pass through unchanged)
-        if (ae.getLastState().containsModeCar()) {
-          if (isAccess) {
-            // Time-shift access legs based on DRT vehicle arrival delay
-            var duration = fetchArrivalDelay(services, request, now);
-            if (duration.isSuccess()) {
-              return new DemandResponsiveTransportationAccessAdapter(ae, duration.successValue());
-            } else {
-              return null;
-            }
-          } else {
-            // For egress, verify DRT service is reachable; filter out if not
-            var duration = fetchArrivalDelay(services, request, now);
-            if (duration.isSuccess()) {
-              return ae;
-            } else {
-              return null;
-            }
-          }
-        } else {
+        if (!ae.getLastState().containsModeCar()) {
           return ae;
+        }
+
+        if (isAccess) {
+          return shiftWithDrtTimes(ae, services, request, now, true);
+        } else {
+          return shiftWithDrtTimes(ae, services, request, now, false);
         }
       })
       .filter(Objects::nonNull)
       .collect(Collectors.toList());
   }
 
-  private static Result<Duration, Error> fetchArrivalDelay(
+  private static RoutingAccessEgress shiftWithDrtTimes(
+    RoutingAccessEgress ae,
     List<DemandResponsiveTransportationService> services,
     RouteRequest request,
-    Instant now
+    Instant now,
+    boolean isAccess
   ) {
-    // we have to shift the start time of a car hailing request because often we cannot leave right
-    // away
-    if (DemandResponsiveTransportationAccessShifter.shouldShift(request, Instant.now())) {
-      var shiftingResult = DemandResponsiveTransportationAccessShifter.arrivalDelay(
-        request,
-        services,
-        now
+    var stopCoordinate = stopCoordinateFromAccessEgress(ae);
+
+    // For access: origin → stop. For egress: stop → destination.
+    var fromCoordinate = isAccess
+      ? new WgsCoordinate(request.from().getCoordinate())
+      : stopCoordinate;
+    var toCoordinate = isAccess ? stopCoordinate : new WgsCoordinate(request.to().getCoordinate());
+
+    var result = fetchDrtEstimate(services, request, now, fromCoordinate, toCoordinate);
+
+    if (result.isSuccess()) {
+      var shift = result.successValue();
+      return new DemandResponsiveTransportationAccessAdapter(
+        ae,
+        shift.pickupDelay(),
+        shift.drtTravelDuration()
       );
-      if (shiftingResult.isSuccess()) {
-        return Result.success(shiftingResult.successValue());
-      } else {
-        LOG.error(
-          "Could not fetch arrival time for car hailing service: {}",
-          shiftingResult.failureValue()
-        );
-        return Result.failure(Error.TECHNICAL_ERROR);
-      }
     } else {
-      return Result.success(Duration.ZERO);
+      return null;
     }
   }
 
-  /**
-   * When you start a car hailing search for right now (which is common) you cannot assume to leave
-   * right away but have to take into account the duration it takes for the hailing vehicle to
-   * arrive.
-   * <p>
-   * This method shifts the departure time by the appropriate amount so that the correct
-   * access/egresses can be calculated.
-   */
-  protected static Result<Duration, Error> arrivalDelay(
-    RouteRequest req,
+  private static WgsCoordinate stopCoordinateFromAccessEgress(RoutingAccessEgress ae) {
+    var vertex = ae.getLastState().getVertex();
+    return new WgsCoordinate(vertex.getLat(), vertex.getLon());
+  }
+
+  private static Result<DrtShiftResult, Error> fetchDrtEstimate(
     List<DemandResponsiveTransportationService> services,
-    Instant now
+    RouteRequest request,
+    Instant now,
+    WgsCoordinate fromCoordinate,
+    WgsCoordinate toCoordinate
   ) {
-    if (shouldShift(req, now)) {
-      return shiftTime(req, services, now);
+    var shiftingResult = shiftTime(request, services, now, fromCoordinate, toCoordinate);
+    if (shiftingResult.isSuccess()) {
+      return Result.success(shiftingResult.successValue());
     } else {
-      return Result.success(Duration.ZERO);
+      LOG.error(
+        "Could not fetch DRT estimate from ({},{}) to ({},{}): {}",
+        fromCoordinate.latitude(),
+        fromCoordinate.longitude(),
+        toCoordinate.latitude(),
+        toCoordinate.longitude(),
+        shiftingResult.failureValue()
+      );
+      return Result.failure(shiftingResult.failureValue());
     }
   }
 
   private static boolean shouldShift(RouteRequest req, Instant now) {
-    // For DRT services, we always check with the service API regardless of how far in the future
-    // the request is, since DRT has limited capacity and specific schedules unlike ride-hailing.
     return (
-      req.journey().modes().accessMode == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION &&
+      (req.journey().modes().accessMode == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION ||
+        req.journey().modes().egressMode == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION) &&
       !req.arriveBy()
     );
   }
 
-  private static Result<Duration, Error> shiftTime(
+  private static Result<DrtShiftResult, Error> shiftTime(
     RouteRequest req,
     List<DemandResponsiveTransportationService> services,
-    Instant now
+    Instant now,
+    WgsCoordinate fromCoordinate,
+    WgsCoordinate toCoordinate
   ) {
     if (req.demandResponsiveExtData() == null) {
       return Result.failure(Error.NO_ARRIVAL_FOR_LOCATION);
@@ -131,18 +136,15 @@ public class DemandResponsiveTransportationAccessShifter {
 
     var service = services.get(0);
 
-    // Use the user's requested departure time, not "now"
     Instant desiredPickupTime = req.dateTime();
-
-    LOG.info("shifting access for DRT, desired pickup time: {}", desiredPickupTime);
 
     var drtEstimationResponse = service.arrivalTimes(
       req.demandResponsiveExtData().paxAppId(),
       req.demandResponsiveExtData().areaId(),
       req.demandResponsiveExtData().userId(),
       req.demandResponsiveExtData().rideType(),
-      new WgsCoordinate(req.from().getCoordinate()),
-      new WgsCoordinate(req.to().getCoordinate()),
+      fromCoordinate,
+      toCoordinate,
       req.demandResponsiveExtData().passengers().regular(),
       req.demandResponsiveExtData().passengers().wheelchair(),
       desiredPickupTime,
@@ -152,27 +154,82 @@ public class DemandResponsiveTransportationAccessShifter {
       return Result.failure(Error.NO_ARRIVAL_FOR_LOCATION);
     }
 
+    if (drtEstimationResponse.user_expected_dropoff_time() == null) {
+      LOG.warn(
+        "DRT response missing dropoff time from ({},{}) to ({},{})",
+        fromCoordinate.latitude(),
+        fromCoordinate.longitude(),
+        toCoordinate.latitude(),
+        toCoordinate.longitude()
+      );
+      return Result.failure(Error.NO_ARRIVAL_FOR_LOCATION);
+    }
+
     Instant userExpectedPickupTime = Instant.ofEpochSecond(
       drtEstimationResponse.user_expected_pickup_time()
     );
+    Instant userExpectedDropoffTime = Instant.ofEpochSecond(
+      drtEstimationResponse.user_expected_dropoff_time()
+    );
 
-    // Calculate how much later than requested the actual pickup will be
-    Duration totalDelay = Duration.between(desiredPickupTime, userExpectedPickupTime);
+    Duration pickupDelay = Duration.between(desiredPickupTime, userExpectedPickupTime);
+    if (pickupDelay.isNegative()) {
+      pickupDelay = Duration.ZERO;
+    }
 
-    // Ensure the delay is not negative
-    if (totalDelay.isNegative()) {
-      totalDelay = Duration.ZERO;
+    Duration drtTravelDuration = Duration.between(userExpectedPickupTime, userExpectedDropoffTime);
+    if (drtTravelDuration.isNegative() || drtTravelDuration.isZero()) {
+      LOG.warn(
+        "DRT travel duration is non-positive ({}) from ({},{}) to ({},{})",
+        drtTravelDuration,
+        fromCoordinate.latitude(),
+        fromCoordinate.longitude(),
+        toCoordinate.latitude(),
+        toCoordinate.longitude()
+      );
+      return Result.failure(Error.TECHNICAL_ERROR);
     }
 
     LOG.info(
-      "DRT time shift: requested={}, expected={}, delay={}",
+      "DRT time shift: from=({},{}) to=({},{}) | requested={} | expectedPickup={} | expectedDropoff={} | pickupDelay={} | drtDuration={}",
+      fromCoordinate.latitude(),
+      fromCoordinate.longitude(),
+      toCoordinate.latitude(),
+      toCoordinate.longitude(),
       desiredPickupTime,
       userExpectedPickupTime,
-      totalDelay
+      userExpectedDropoffTime,
+      pickupDelay,
+      drtTravelDuration
     );
 
-    return Result.success(totalDelay);
+    return Result.success(new DrtShiftResult(pickupDelay, drtTravelDuration));
   }
+
+  /**
+   * When you start a DRT search, you cannot assume to leave right away but have to take into
+   * account both the pickup delay and the actual DRT travel duration to each transit stop.
+   */
+  protected static Result<DrtShiftResult, Error> arrivalDelay(
+    RouteRequest req,
+    List<DemandResponsiveTransportationService> services,
+    Instant now,
+    WgsCoordinate stopCoordinate
+  ) {
+    if (shouldShift(req, now)) {
+      return shiftTime(
+        req,
+        services,
+        now,
+        new WgsCoordinate(req.from().getCoordinate()),
+        stopCoordinate
+      );
+    } else {
+      return Result.success(new DrtShiftResult(Duration.ZERO, Duration.ZERO));
+    }
+  }
+
+  record DrtShiftResult(Duration pickupDelay, Duration drtTravelDuration) {}
 
   enum Error {
     NO_ARRIVAL_FOR_LOCATION,

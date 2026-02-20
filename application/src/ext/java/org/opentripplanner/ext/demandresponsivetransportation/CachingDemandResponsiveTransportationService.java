@@ -62,18 +62,15 @@ public abstract class CachingDemandResponsiveTransportationService
     // Check if we have a cached response
     var cachedResponse = estimateCache.getIfPresent(cacheKey);
     if (cachedResponse != null) {
-      LOG.info(
-        "[DRT] CACHE HIT | context={} | areaId={} | from=({},{}) | to=({},{}) | pickupTime={} | " +
-        "cachedPickupTime={} | cachedDropoffTime={}",
+      LOG.debug(
+        "[DRT] CACHE HIT | context={} | areaId={} | from=({},{}) | to=({},{}) | pickupTime={}",
         context,
         areaId,
         fromCoordinate.latitude(),
         fromCoordinate.longitude(),
         toCoordinate.latitude(),
         toCoordinate.longitude(),
-        desiredPickupTime,
-        cachedResponse.user_expected_pickup_time(),
-        cachedResponse.user_expected_dropoff_time()
+        desiredPickupTime
       );
       return cachedResponse;
     }

@@ -14,6 +14,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.opentripplanner._support.time.ZoneIds;
+import org.opentripplanner.framework.geometry.WgsCoordinate;
 import org.opentripplanner.model.GenericLocation;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.DefaultAccessEgress;
 import org.opentripplanner.routing.api.request.DemandResponsiveExtData;
@@ -27,13 +28,15 @@ import org.opentripplanner.street.search.state.TestStateBuilder;
  * Tests for DemandResponsiveTransportationAccessShifter.
  *
  * These tests verify that DRT access times are correctly shifted based on the
- * expected pickup time returned by the DRT service.
+ * expected pickup time and that the access duration is adjusted to the actual
+ * DRT travel duration returned by the DRT service.
  */
 class DemandResponsiveTransportationAccessShifterTest {
 
   private static final Instant NOW = OffsetDateTime.parse("2023-03-23T17:00:00+01:00").toInstant();
   private static final GenericLocation FROM = new GenericLocation(0d, 0d);
   private static final GenericLocation TO = new GenericLocation(1d, 1d);
+  private static final WgsCoordinate STOP_COORDINATE = new WgsCoordinate(0.5, 0.5);
 
   private final DemandResponsiveTransportationService service =
     new TestDemandResponsiveTransportationService();
@@ -63,11 +66,21 @@ class DemandResponsiveTransportationAccessShifterTest {
     var result = DemandResponsiveTransportationAccessShifter.arrivalDelay(
       req,
       List.of(service),
-      NOW
+      NOW,
+      STOP_COORDINATE
     );
 
     assertTrue(result.isSuccess(), "arrivalDelay should succeed");
-    assertEquals(expectedDelay, result.successValue(), "Delay should match expected");
+    assertEquals(
+      expectedDelay,
+      result.successValue().pickupDelay(),
+      "Pickup delay should match expected"
+    );
+    assertEquals(
+      Duration.ofMinutes(30),
+      result.successValue().drtTravelDuration(),
+      "DRT travel duration should be 30 minutes"
+    );
   }
 
   @Test
@@ -106,6 +119,13 @@ class DemandResponsiveTransportationAccessShifterTest {
       LocalTime.ofSecondOfDay(shiftedStart),
       "Shifted start time should include DRT pickup delay"
     );
+
+    // Verify the duration is the DRT travel duration (30 min), not the car-based duration
+    assertEquals(
+      1800,
+      shiftedAccess.durationInSeconds(),
+      "Access duration should be the DRT travel duration (30 min), not car driving time"
+    );
   }
 
   @Test
@@ -130,13 +150,12 @@ class DemandResponsiveTransportationAccessShifterTest {
   }
 
   @Test
-  void testEgressNotShifted() {
+  void testEgressShiftedWithDrtTimes() {
     var drivingState = TestStateBuilder.ofDriving().streetEdge().streetEdge().build();
     var egress = new DefaultAccessEgress(0, drivingState);
 
     RouteRequest req = createRouteRequest(NOW);
 
-    // Egress (isAccess=false) should not be shifted
     var shifted = DemandResponsiveTransportationAccessShifter.shiftAccesses(
       false, // egress
       List.of(egress),
@@ -145,9 +164,20 @@ class DemandResponsiveTransportationAccessShifterTest {
       NOW
     );
 
-    assertEquals(1, shifted.size(), "Should return the egress");
-    // Egress is not shifted, so it should be the original
-    assertEquals(egress, shifted.get(0), "Egress should not be wrapped");
+    assertEquals(1, shifted.size(), "Should return one shifted egress");
+
+    var shiftedEgress = shifted.get(0);
+    assertTrue(
+      shiftedEgress instanceof DemandResponsiveTransportationAccessAdapter,
+      "Shifted egress should be wrapped in DemandResponsiveTransportationAccessAdapter"
+    );
+
+    // Verify the duration is the DRT travel duration (30 min), not the car-based duration
+    assertEquals(
+      1800,
+      shiftedEgress.durationInSeconds(),
+      "Egress duration should be the DRT travel duration (30 min), not car driving time"
+    );
   }
 
   @Test
@@ -158,13 +188,14 @@ class DemandResponsiveTransportationAccessShifterTest {
     var result = DemandResponsiveTransportationAccessShifter.arrivalDelay(
       req,
       List.of(service),
-      NOW
+      NOW,
+      STOP_COORDINATE
     );
 
     assertTrue(result.isSuccess(), "arrivalDelay should succeed");
     assertEquals(
       Duration.ZERO,
-      result.successValue(),
+      result.successValue().pickupDelay(),
       "arriveBy requests should not be shifted (return zero delay)"
     );
   }

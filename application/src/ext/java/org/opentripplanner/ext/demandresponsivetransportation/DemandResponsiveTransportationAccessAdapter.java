@@ -6,16 +6,26 @@ import org.opentripplanner.routing.algorithm.raptoradapter.transit.DefaultAccess
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.RoutingAccessEgress;
 
 /**
- * This class is used to adapt the ride hailing accesses (not egresses) into a time-dependent
+ * This class is used to adapt the DRT accesses (not egresses) into a time-dependent
  * multi-leg {@link DefaultAccessEgress}.
+ * <p>
+ * It shifts the departure time by the pickup delay and overrides the access duration
+ * with the actual DRT travel duration (from the Shotl API), replacing the car-based
+ * duration from street routing.
  */
 public final class DemandResponsiveTransportationAccessAdapter extends DefaultAccessEgress {
 
   private final Duration arrival;
+  private final int drtDurationSeconds;
 
-  public DemandResponsiveTransportationAccessAdapter(RoutingAccessEgress access, Duration arrival) {
+  public DemandResponsiveTransportationAccessAdapter(
+    RoutingAccessEgress access,
+    Duration arrival,
+    Duration drtDuration
+  ) {
     super(access.stop(), access.getLastState());
     this.arrival = arrival;
+    this.drtDurationSeconds = (int) drtDuration.toSeconds();
   }
 
   public DemandResponsiveTransportationAccessAdapter(
@@ -24,6 +34,12 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
   ) {
     super(other, penalty);
     this.arrival = other.arrival;
+    this.drtDurationSeconds = other.drtDurationSeconds;
+  }
+
+  @Override
+  public int durationInSeconds() {
+    return drtDurationSeconds;
   }
 
   @Override

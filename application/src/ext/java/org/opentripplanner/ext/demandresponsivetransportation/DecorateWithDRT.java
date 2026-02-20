@@ -78,7 +78,7 @@ public class DecorateWithDRT implements ItineraryListFilter {
         leg.getTo().coordinate,
         request.demandResponsiveExtData().passengers().regular(),
         request.demandResponsiveExtData().passengers().wheelchair(),
-        leg.getStartTime().toInstant(),
+        request.dateTime(),
         DrtRequestContext.LEG_DECORATING
       );
       if (drtEstimationResponse == null) {
