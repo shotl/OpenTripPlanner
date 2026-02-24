@@ -305,6 +305,11 @@ public class DefaultTransitService implements TransitEditorService {
   }
 
   @Override
+  public Set<StopLocation> getDrtEligibleStops() {
+    return timetableRepository.getDrtEligibleStops();
+  }
+
+  @Override
   public Collection<StopLocation> findStopOrChildStops(FeedScopedId id) {
     return timetableRepository.getSiteRepository().findStopOrChildStops(id);
   }

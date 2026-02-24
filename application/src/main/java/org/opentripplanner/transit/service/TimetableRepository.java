@@ -138,6 +138,13 @@ public class TimetableRepository implements Serializable {
 
   private final Map<FeedScopedId, RegularStop> stopsByScheduledStopPointRefs = new HashMap<>();
 
+  /**
+   * Set of stops eligible for DRT (Demand Responsive Transportation) access/egress.
+   * When non-empty, only these stops will be considered for DRT street routing.
+   * An empty set means no DRT stop filtering is applied (all stops are eligible).
+   */
+  private Set<StopLocation> drtEligibleStops = Set.of();
+
   @Inject
   public TimetableRepository(SiteRepository siteRepository, Deduplicator deduplicator) {
     this.siteRepository = Objects.requireNonNull(siteRepository);
@@ -620,6 +627,21 @@ public class TimetableRepository implements Serializable {
         .toList()
     );
     return stopLocations;
+  }
+
+  /**
+   * Get the set of stops eligible for DRT access/egress. When non-empty, only these stops
+   * will be considered for DRT street routing. An empty set means no filtering is applied.
+   */
+  public Set<StopLocation> getDrtEligibleStops() {
+    return drtEligibleStops;
+  }
+
+  /**
+   * Set the stops eligible for DRT access/egress, loaded from {@code drt_stops.txt} in GTFS.
+   */
+  public void setDrtEligibleStops(Set<StopLocation> drtEligibleStops) {
+    this.drtEligibleStops = Set.copyOf(drtEligibleStops);
   }
 
   private void invalidateIndex() {

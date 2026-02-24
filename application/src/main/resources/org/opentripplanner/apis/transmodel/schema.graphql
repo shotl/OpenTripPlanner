@@ -168,6 +168,10 @@ type DRTEstimate {
   desiredPickupLocation: DRTGeoLocation!
   "Desired pickup time as epoch seconds."
   desiredPickupTime: Long!
+  "Estimated dropoff time as an ISO-8601 datetime with timezone offset."
+  estimatedDropoffTime: DateTime
+  "Estimated pickup time as an ISO-8601 datetime with timezone offset."
+  estimatedPickupTime: DateTime
   "Unique identifier for the quoted ride."
   id: String!
   "Passenger details for the ride."

@@ -5,9 +5,14 @@ package org.opentripplanner.ext.demandresponsivetransportation;
  */
 public enum DrtRequestContext {
   /**
-   * Request originates from the access/egress time shifting phase during routing.
+   * Request originates from the access time shifting phase during routing.
    */
   ACCESS_SHIFTING,
+
+  /**
+   * Request originates from the egress time shifting phase during routing.
+   */
+  EGRESS_SHIFTING,
 
   /**
    * Request originates from the itinerary decoration phase (adding DRT estimates to legs).

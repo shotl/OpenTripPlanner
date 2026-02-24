@@ -409,7 +409,7 @@ public class LegType {
         GraphQLFieldDefinition.newFieldDefinition()
           .name("drtEstimate")
           .description("Estimate of a DRT ride (e.g. Shotl). Only present for DRT legs.")
-          .type(DRTEstimateType.OUTPUT_TYPE)
+          .type(DRTEstimateType.create(dateTimeScalar))
           .dataFetcher(env -> {
             Leg l = leg(env);
             if (

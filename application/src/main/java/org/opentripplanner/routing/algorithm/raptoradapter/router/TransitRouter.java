@@ -44,6 +44,7 @@ import org.opentripplanner.routing.api.response.RoutingError;
 import org.opentripplanner.routing.api.response.RoutingErrorCode;
 import org.opentripplanner.routing.error.RoutingValidationException;
 import org.opentripplanner.routing.framework.DebugTimingAggregator;
+import org.opentripplanner.routing.graphfinder.NearbyStop;
 import org.opentripplanner.routing.via.ViaCoordinateTransferFactory;
 import org.opentripplanner.standalone.api.OtpServerRequestContext;
 import org.opentripplanner.street.search.TemporaryVerticesContainer;
@@ -306,6 +307,12 @@ public class TransitRouter {
     //   );
     // }
 
+    // Filter DRT-mode access/egress to only DRT-eligible stops (loaded from drt_stops.txt).
+    // Walk-accessible stops are added separately below and are NOT filtered.
+    if (mode == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION) {
+      nearbyStops = filterDrtEligibleStops(nearbyStops);
+    }
+
     var accessEgresses = AccessEgressMapper.mapNearbyStops(nearbyStops, type);
 
     // LOG.info("[DRT-DEBUG] accessEgresses after mapping: count={}", accessEgresses.size());
@@ -492,5 +499,17 @@ public class TransitRouter {
     return service == null
       ? null
       : service.createExtraMcRouterSearch(request, accessEgresses, raptorTransitData);
+  }
+
+  /**
+   * Filter nearby stops to only include DRT-eligible stops. If no DRT-eligible stops
+   * are configured (empty set), all stops are returned unfiltered.
+   */
+  private Collection<NearbyStop> filterDrtEligibleStops(Collection<NearbyStop> nearbyStops) {
+    var drtEligibleStops = serverContext.transitService().getDrtEligibleStops();
+    if (drtEligibleStops.isEmpty()) {
+      return nearbyStops;
+    }
+    return nearbyStops.stream().filter(ns -> drtEligibleStops.contains(ns.stop)).toList();
   }
 }

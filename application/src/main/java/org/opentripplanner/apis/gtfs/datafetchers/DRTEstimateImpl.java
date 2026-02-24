@@ -2,6 +2,10 @@ package org.opentripplanner.apis.gtfs.datafetchers;
 
 import graphql.schema.DataFetcher;
 import graphql.schema.DataFetchingEnvironment;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import org.opentripplanner.apis.gtfs.GraphQLRequestContext;
 import org.opentripplanner.apis.gtfs.generated.GraphQLDataFetchers;
 import org.opentripplanner.apis.gtfs.model.DRTGeoLocation;
 import org.opentripplanner.apis.gtfs.model.DRTPassengers;
@@ -107,6 +111,30 @@ public class DRTEstimateImpl implements GraphQLDataFetchers.GraphQLDrtEstimate {
   @Override
   public DataFetcher<Long> userExpectedDropoffTime() {
     return env -> getSource(env).user_expected_dropoff_time();
+  }
+
+  @Override
+  public DataFetcher<OffsetDateTime> estimatedPickupTime() {
+    return env -> {
+      Long epochSeconds = getSource(env).user_expected_pickup_time();
+      if (epochSeconds == null) {
+        return null;
+      }
+      ZoneId zoneId = env.<GraphQLRequestContext>getContext().transitService().getTimeZone();
+      return Instant.ofEpochSecond(epochSeconds).atZone(zoneId).toOffsetDateTime();
+    };
+  }
+
+  @Override
+  public DataFetcher<OffsetDateTime> estimatedDropoffTime() {
+    return env -> {
+      Long epochSeconds = getSource(env).user_expected_dropoff_time();
+      if (epochSeconds == null) {
+        return null;
+      }
+      ZoneId zoneId = env.<GraphQLRequestContext>getContext().transitService().getTimeZone();
+      return Instant.ofEpochSecond(epochSeconds).atZone(zoneId).toOffsetDateTime();
+    };
   }
 
   @Override

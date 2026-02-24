@@ -398,6 +398,10 @@ public class GraphQLDataFetchers {
 
     public DataFetcher<Long> userExpectedPickupTime();
 
+    public DataFetcher<java.time.OffsetDateTime> estimatedPickupTime();
+
+    public DataFetcher<java.time.OffsetDateTime> estimatedDropoffTime();
+
     public DataFetcher<String> userId();
 
     public DataFetcher<String> vehicleId();

@@ -7,6 +7,7 @@ import java.time.ZoneId;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.opentripplanner.ext.dataoverlay.EdgeUpdaterModule;
+import org.opentripplanner.ext.demandresponsivetransportation.DrtStopsModule;
 import org.opentripplanner.ext.emissions.EmissionsDataModel;
 import org.opentripplanner.ext.emissions.EmissionsModule;
 import org.opentripplanner.ext.flex.AreaStopsToVerticesMapper;
@@ -45,6 +46,7 @@ public interface GraphBuilderFactory {
   GraphBuilder graphBuilder();
   OsmModule osmModule();
   GtfsModule gtfsModule();
+  DrtStopsModule drtStopsModule();
   EmissionsModule emissionsModule();
   NetexModule netexModule();
   TimeZoneAdjusterModule timeZoneAdjusterModule();

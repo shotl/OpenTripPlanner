@@ -173,6 +173,11 @@ public class GraphBuilder implements Runnable {
       graphBuilder.addModule(factory.emissionsModule());
     }
 
+    // Load DRT-eligible stops from drt_stops.txt in GTFS feeds (if present)
+    if (hasTransitData) {
+      graphBuilder.addModule(factory.drtStopsModule());
+    }
+
     graphBuilder.addModuleOptional(factory.routeToCentroidStationIdValidator());
 
     if (config.dataImportReport) {

@@ -1,6 +1,7 @@
 package org.opentripplanner.ext.demandresponsivetransportation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
@@ -150,13 +151,13 @@ class DemandResponsiveTransportationAccessShifterTest {
   }
 
   @Test
-  void testEgressShiftedWithDrtTimes() {
+  void testEgressNotShiftedBeforeRaptor() {
     var drivingState = TestStateBuilder.ofDriving().streetEdge().streetEdge().build();
     var egress = new DefaultAccessEgress(0, drivingState);
 
     RouteRequest req = createRouteRequest(NOW);
 
-    var shifted = DemandResponsiveTransportationAccessShifter.shiftAccesses(
+    var result = DemandResponsiveTransportationAccessShifter.shiftAccesses(
       false, // egress
       List.of(egress),
       List.of(service),
@@ -164,19 +165,11 @@ class DemandResponsiveTransportationAccessShifterTest {
       NOW
     );
 
-    assertEquals(1, shifted.size(), "Should return one shifted egress");
-
-    var shiftedEgress = shifted.get(0);
-    assertTrue(
-      shiftedEgress instanceof DemandResponsiveTransportationAccessAdapter,
-      "Shifted egress should be wrapped in DemandResponsiveTransportationAccessAdapter"
-    );
-
-    // Verify the duration is the DRT travel duration (30 min), not the car-based duration
-    assertEquals(
-      1800,
-      shiftedEgress.durationInSeconds(),
-      "Egress duration should be the DRT travel duration (30 min), not car driving time"
+    assertEquals(1, result.size(), "Egress should be returned unmodified");
+    assertSame(
+      egress,
+      result.get(0),
+      "Egress shifting is deferred to leg decoration, so the original egress should be returned"
     );
   }
 

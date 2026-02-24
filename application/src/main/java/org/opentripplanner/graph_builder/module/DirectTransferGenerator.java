@@ -98,6 +98,7 @@ public class DirectTransferGenerator implements GraphBuilderModule {
     List<TransitStopVertex> stops = graph.getVerticesOfType(TransitStopVertex.class);
     Set<StopLocation> carsAllowedStops =
       timetableRepository.getStopLocationsUsedForCarsAllowedTrips();
+    Set<StopLocation> drtEligibleStops = timetableRepository.getDrtEligibleStops();
 
     LOG.info("Creating transfers based on requests:");
     transferRequests.forEach(transferProfile -> LOG.info(transferProfile.toString()));
@@ -142,7 +143,13 @@ public class DirectTransferGenerator implements GraphBuilderModule {
 
         LOG.debug("Linking stop '{}' {}", stop, ts0);
 
-        calculateDefaultTransfers(transferConfiguration, ts0, stop, distinctTransfers);
+        calculateDefaultTransfers(
+          transferConfiguration,
+          ts0,
+          stop,
+          distinctTransfers,
+          drtEligibleStops
+        );
         calculateFlexTransfers(transferConfiguration, ts0, stop, distinctTransfers);
         calculateCarsAllowedTransfers(
           transferConfiguration,
@@ -321,16 +328,25 @@ public class DirectTransferGenerator implements GraphBuilderModule {
   }
 
   /**
-   * This method calculates default transfers.
+   * This method calculates default transfers. When drtEligibleStops is non-empty, transfers
+   * for CAR mode are restricted to only connect DRT-eligible stops.
    */
   private void calculateDefaultTransfers(
     TransferConfiguration transferConfiguration,
     TransitStopVertex ts0,
     RegularStop stop,
-    Map<TransferKey, PathTransfer> distinctTransfers
+    Map<TransferKey, PathTransfer> distinctTransfers,
+    Set<StopLocation> drtEligibleStops
   ) {
     for (RouteRequest transferProfile : transferConfiguration.defaultTransferRequests()) {
       StreetMode mode = transferProfile.journey().transfer().mode();
+
+      // If DRT-eligible stops are configured and mode is CAR, skip source stops not in the set.
+      boolean filterByDrt = !drtEligibleStops.isEmpty() && mode == StreetMode.CAR;
+      if (filterByDrt && !drtEligibleStops.contains(stop)) {
+        continue;
+      }
+
       var nearbyStops = transferConfiguration
         .defaultNearbyStopFinderForMode()
         .get(mode)
@@ -341,6 +357,10 @@ public class DirectTransferGenerator implements GraphBuilderModule {
           continue;
         }
         if (sd.stop.transfersNotAllowed()) {
+          continue;
+        }
+        // Filter destination stops for DRT-eligible modes.
+        if (filterByDrt && !drtEligibleStops.contains(sd.stop)) {
           continue;
         }
         createPathTransfer(stop, sd.stop, sd, distinctTransfers, mode);

@@ -12,6 +12,7 @@ import javax.annotation.Nullable;
 import org.opentripplanner.datastore.api.DataSource;
 import org.opentripplanner.ext.dataoverlay.EdgeUpdaterModule;
 import org.opentripplanner.ext.dataoverlay.configure.DataOverlayFactory;
+import org.opentripplanner.ext.demandresponsivetransportation.DrtStopsModule;
 import org.opentripplanner.ext.emissions.EmissionsDataModel;
 import org.opentripplanner.ext.emissions.EmissionsModule;
 import org.opentripplanner.ext.stopconsolidation.StopConsolidationModule;
@@ -124,6 +125,15 @@ public class GraphBuilderModules {
       config.getTransitServicePeriod(),
       config.fareServiceFactory
     );
+  }
+
+  @Provides
+  @Singleton
+  static DrtStopsModule provideDrtStopsModule(
+    GraphBuilderDataSources dataSources,
+    TimetableRepository timetableRepository
+  ) {
+    return new DrtStopsModule(dataSources.getGtfsConfiguredDatasource(), timetableRepository);
   }
 
   @Provides

@@ -9,6 +9,7 @@ import org.opentripplanner.framework.geometry.WgsCoordinate;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.RoutingAccessEgress;
 import org.opentripplanner.routing.api.request.RouteRequest;
 import org.opentripplanner.routing.api.request.StreetMode;
+import org.opentripplanner.street.search.state.CarPickupState;
 import org.opentripplanner.transit.model.framework.Result;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +38,12 @@ public class DemandResponsiveTransportationAccessShifter {
     RouteRequest request,
     Instant now
   ) {
+    if (!isAccess) {
+      // Egress shifting is deferred to the leg decoration phase (DecorateWithDRT),
+      // which has the actual transit arrival time to use as the pickup time.
+      return results;
+    }
+
     if (!shouldShift(request, Instant.now())) {
       return results;
     }
@@ -47,12 +54,7 @@ public class DemandResponsiveTransportationAccessShifter {
         if (!ae.getLastState().containsModeCar()) {
           return ae;
         }
-
-        if (isAccess) {
-          return shiftWithDrtTimes(ae, services, request, now, true);
-        } else {
-          return shiftWithDrtTimes(ae, services, request, now, false);
-        }
+        return shiftWithDrtTimes(ae, services, request, now, true);
       })
       .filter(Objects::nonNull)
       .collect(Collectors.toList());
@@ -65,7 +67,7 @@ public class DemandResponsiveTransportationAccessShifter {
     Instant now,
     boolean isAccess
   ) {
-    var stopCoordinate = stopCoordinateFromAccessEgress(ae);
+    var stopCoordinate = stopCoordinateFromAccessEgress(ae, isAccess);
 
     // For access: origin → stop. For egress: stop → destination.
     var fromCoordinate = isAccess
@@ -73,7 +75,7 @@ public class DemandResponsiveTransportationAccessShifter {
       : stopCoordinate;
     var toCoordinate = isAccess ? stopCoordinate : new WgsCoordinate(request.to().getCoordinate());
 
-    var result = fetchDrtEstimate(services, request, now, fromCoordinate, toCoordinate);
+    var result = fetchDrtEstimate(services, request, now, fromCoordinate, toCoordinate, isAccess);
 
     if (result.isSuccess()) {
       var shift = result.successValue();
@@ -87,8 +89,32 @@ public class DemandResponsiveTransportationAccessShifter {
     }
   }
 
-  private static WgsCoordinate stopCoordinateFromAccessEgress(RoutingAccessEgress ae) {
-    var vertex = ae.getLastState().getVertex();
+  private static WgsCoordinate stopCoordinateFromAccessEgress(
+    RoutingAccessEgress ae,
+    boolean isAccess
+  ) {
+    var state = ae.getLastState();
+    if (isAccess) {
+      // For access: walk backward from TransitStopVertex through the WALK_FROM_DROP_OFF
+      // states to find the car drop-off vertex (last IN_CAR state). This matches
+      // the coordinate the leg decorator uses as the car leg's "to" place, which is
+      // determined by the CarPickupState split in GraphPathToItineraryMapper.sliceStates.
+      while (state.getBackState() != null && state.getCarPickupState() != CarPickupState.IN_CAR) {
+        state = state.getBackState();
+      }
+    } else {
+      // For egress (reversed chain with proper CarPickupState after State.reverse() fix):
+      // DestinationVertex(WALK_FROM_DROP_OFF) -> ... -> IN_CAR -> ... -> WALK_TO_PICKUP -> ... -> TransitStopVertex
+      // Walk backward from DestinationVertex through WALK_FROM_DROP_OFF and IN_CAR states
+      // to find the car pickup boundary (first WALK_TO_PICKUP). This matches the coordinate
+      // the leg decorator uses as the car leg's "from" place.
+      while (
+        state.getBackState() != null && state.getCarPickupState() != CarPickupState.WALK_TO_PICKUP
+      ) {
+        state = state.getBackState();
+      }
+    }
+    var vertex = state.getVertex();
     return new WgsCoordinate(vertex.getLat(), vertex.getLon());
   }
 
@@ -97,9 +123,10 @@ public class DemandResponsiveTransportationAccessShifter {
     RouteRequest request,
     Instant now,
     WgsCoordinate fromCoordinate,
-    WgsCoordinate toCoordinate
+    WgsCoordinate toCoordinate,
+    boolean isAccess
   ) {
-    var shiftingResult = shiftTime(request, services, now, fromCoordinate, toCoordinate);
+    var shiftingResult = shiftTime(request, services, now, fromCoordinate, toCoordinate, isAccess);
     if (shiftingResult.isSuccess()) {
       return Result.success(shiftingResult.successValue());
     } else {
@@ -128,7 +155,8 @@ public class DemandResponsiveTransportationAccessShifter {
     List<DemandResponsiveTransportationService> services,
     Instant now,
     WgsCoordinate fromCoordinate,
-    WgsCoordinate toCoordinate
+    WgsCoordinate toCoordinate,
+    boolean isAccess
   ) {
     if (req.demandResponsiveExtData() == null) {
       return Result.failure(Error.NO_ARRIVAL_FOR_LOCATION);
@@ -148,7 +176,7 @@ public class DemandResponsiveTransportationAccessShifter {
       req.demandResponsiveExtData().passengers().regular(),
       req.demandResponsiveExtData().passengers().wheelchair(),
       desiredPickupTime,
-      DrtRequestContext.ACCESS_SHIFTING
+      isAccess ? DrtRequestContext.ACCESS_SHIFTING : DrtRequestContext.EGRESS_SHIFTING
     );
     if (drtEstimationResponse == null) {
       return Result.failure(Error.NO_ARRIVAL_FOR_LOCATION);
@@ -222,7 +250,8 @@ public class DemandResponsiveTransportationAccessShifter {
         services,
         now,
         new WgsCoordinate(req.from().getCoordinate()),
-        stopCoordinate
+        stopCoordinate,
+        true
       );
     } else {
       return Result.success(new DrtShiftResult(Duration.ZERO, Duration.ZERO));

@@ -405,4 +405,10 @@ public interface TransitService {
    * Returns a list of {@link StopLocation}s that match the filtering defined in the request.
    */
   Collection<StopLocation> findStopLocations(FindStopLocationsRequest request);
+
+  /**
+   * Get the set of stops eligible for DRT access/egress. When non-empty, only these stops
+   * will be considered for DRT street routing. An empty set means no filtering is applied.
+   */
+  Set<StopLocation> getDrtEligibleStops();
 }

@@ -1,5 +1,6 @@
 package org.opentripplanner.ext.demandresponsivetransportation;
 
+import java.time.Instant;
 import java.util.List;
 import org.opentripplanner.ext.demandresponsivetransportation.model.DRTLeg;
 import org.opentripplanner.model.SystemNotice;
@@ -50,10 +51,10 @@ public class DecorateWithDRT implements ItineraryListFilter {
 
   private Itinerary addDRTInformation(Itinerary i, DemandResponsiveTransportationService service) {
     if (!i.isFlaggedForDeletion()) {
-      var legs = i
-        .getLegs()
+      var allLegs = i.getLegs();
+      var legs = allLegs
         .parallelStream()
-        .map(leg -> decorateLegWithRideEstimate(i, leg, service))
+        .map(leg -> decorateLegWithRideEstimate(i, leg, allLegs, service))
         .toList();
 
       i.setLegs(legs);
@@ -61,13 +62,33 @@ public class DecorateWithDRT implements ItineraryListFilter {
     return i;
   }
 
+  private boolean isEgressLeg(Leg leg, List<Leg> allLegs) {
+    int legIndex = allLegs.indexOf(leg);
+    for (int j = 0; j < legIndex; j++) {
+      if (allLegs.get(j).isTransitLeg()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private Leg decorateLegWithRideEstimate(
     Itinerary i,
     Leg leg,
+    List<Leg> allLegs,
     DemandResponsiveTransportationService service
   ) {
     if (leg instanceof StreetLeg sl && sl.getMode().isInCar()) {
-      LOG.info("decorating leg with DRT estimate");
+      boolean isEgress = isEgressLeg(leg, allLegs);
+      // For egress legs, use the leg's start time (actual transit arrival time)
+      // instead of the request departure time, since the passenger arrives later.
+      var pickupTime = isEgress ? leg.getStartTime().toInstant() : request.dateTime();
+
+      LOG.info(
+        "decorating {} leg with DRT estimate, pickupTime={}",
+        isEgress ? "egress" : "access",
+        pickupTime
+      );
 
       var drtEstimationResponse = service.arrivalTimes(
         request.demandResponsiveExtData().paxAppId(),
@@ -78,13 +99,35 @@ public class DecorateWithDRT implements ItineraryListFilter {
         leg.getTo().coordinate,
         request.demandResponsiveExtData().passengers().regular(),
         request.demandResponsiveExtData().passengers().wheelchair(),
-        request.dateTime(),
+        pickupTime,
         DrtRequestContext.LEG_DECORATING
       );
       if (drtEstimationResponse == null) {
-        LOG.warn("No DRT estimate available for leg: {}", leg);
+        LOG.warn(
+          "No DRT estimate available for {} leg from ({},{}) to ({},{}) at {} — flagging itinerary for deletion",
+          isEgress ? "egress" : "access",
+          leg.getFrom().coordinate.latitude(),
+          leg.getFrom().coordinate.longitude(),
+          leg.getTo().coordinate.latitude(),
+          leg.getTo().coordinate.longitude(),
+          pickupTime
+        );
         flagForDeletion(i);
         return leg;
+      }
+
+      if (isEgress) {
+        LOG.info(
+          "Egress DRT decoration: from ({},{}) to ({},{}) | legStartTime={} | pickupTime={} | expectedPickup={} | expectedDropoff={}",
+          leg.getFrom().coordinate.latitude(),
+          leg.getFrom().coordinate.longitude(),
+          leg.getTo().coordinate.latitude(),
+          leg.getTo().coordinate.longitude(),
+          leg.getStartTime().toInstant(),
+          pickupTime,
+          drtEstimationResponse.user_expected_pickup_time(),
+          drtEstimationResponse.user_expected_dropoff_time()
+        );
       }
 
       return new DRTLeg(sl, drtEstimationResponse);
