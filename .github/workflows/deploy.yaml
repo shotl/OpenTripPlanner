@@ -16,6 +16,7 @@ env:
   VALUES_REPO_NAME: platform-deployments
   VALUES_GH_REPO_BRANCH: main
   ARGOCD_PROJECT: shotl
+  IMAGE_REPOSITORY: otp
   STAGING_SLACK_WEBHOOK_URL: ${{ secrets.STAGING_DEPLOYMENT_SLACK_WEBHOOK_URL }}
   PRODUCTION_SLACK_WEBHOOK_URL: ${{ secrets.PRODUCTION_DEPLOYMENT_SLACK_WEBHOOK_URL }}
   LOG_LEVEL: info
@@ -69,8 +70,40 @@ jobs:
           echo "EKS_CLUSTER_NAME=shotl-prod_euw1_k8s-shotl_eks" >> "$GITHUB_ENV"
           echo "EKS_CLUSTER_ALIAS=shotl-prod" >> "$GITHUB_ENV"
           echo "APP_VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_ENV"
+          # Check if this is a -build tagged version
+          if [[ "${{ env.APP_VERSION }}" == *"-build" ]]; then
+            echo "IS_BUILD_TAG=true" >> "$GITHUB_ENV"
+            echo "DOCKER_TAG=otp:${APP_VERSION}" >> "$GITHUB_ENV"
+          else
+            echo "IS_BUILD_TAG=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Login to ECR
+        if: env.IS_BUILD_TAG == 'true'
+        run: |
+          aws ecr get-login-password --region ${{ vars.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.AWS_REGISTRY }}
+
+      - name: Build image and run OTP graph build
+        if: env.IS_BUILD_TAG == 'true'
+        run: |
+          # Build the image with the tag
+          shotool build -t ${{ env.DOCKER_TAG }}
+
+          # Run OTP entrypoint with graph build in the newly built image
+          docker run --rm \
+            -v /app/build:/app/build \
+            -e ENV=production \
+            ${{ env.AWS_REGISTRY }}/otp:${{ env.APP_VERSION }} \
+            --max-memory 6 build
 
       - name: Deploy
+        if: env.IS_BUILD_TAG == 'false'
         run: |
-          ARGS="--app-version ${{ env.APP_VERSION }} --build --image-repository otp"
+          ARGS="--app-version ${{ env.APP_VERSION }} --build"
+          shotool deploy ${ARGS}
+
+      - name: Deploy (post-build)
+        if: env.IS_BUILD_TAG == 'true'
+        run: |
+          ARGS="--app-version ${{ env.APP_VERSION }}"
           shotool deploy ${ARGS}
