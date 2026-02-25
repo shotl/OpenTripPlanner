@@ -1,0 +1,21 @@
+{
+    "demandResponsiveTransportationServices": [
+        {
+            "type": "shotl-demand-responsive-transportation",
+            "enabled": true,
+            "estimationsURL": "http://localhost:60011/",
+            "providerName": "Shotl"
+        }   
+    ],
+    "routingDefaults": {
+        "accessEgress": {
+            "maxStopCountForMode": {
+                "DEMAND_RESPONSIVE_TRANSPORTATION": 500
+            },
+            "maxDurationForMode": {
+                "WALK": "PT10M",
+                "DEMAND_RESPONSIVE_TRANSPORTATION": "PT30M"
+            }
+        }
+    }
+}

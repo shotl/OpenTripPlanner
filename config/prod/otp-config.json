@@ -1,0 +1,9 @@
+{
+  "otpFeatures" : {
+    "APIBikeRental": false,
+    "FloatingBike": false,
+    "ActuatorAPI": true,
+    "SandboxAPILegacyGraphQLApi": true,
+    "ParallelRouting": true
+  }
+}

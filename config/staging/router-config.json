@@ -1,0 +1,10 @@
+{
+    "demandResponsiveTransportationServices": [
+        {
+            "type": "shotl-demand-responsive-transportation",
+            "enabled": true,
+            "estimationsURL": "http://rides.shotl.aws:60011/",
+            "providerName": "Shotl"
+        }
+    ]
+}

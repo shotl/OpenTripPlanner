@@ -1,0 +1,22 @@
+{
+  "transitServiceStart" : "-P1M",
+  "transitServiceEnd" : "P1Y",
+  "osmCacheDataInMem" : true,
+  "localFileNamePatterns" : {
+    "osm" : "(i?)\\.osm\\.pbf$",
+    "dem" : "(i?)\\.dem\\.tiff?$",
+    "gtfs" : "(?i)gtfs",
+    "netex" : "(?i)netex"
+  },
+  "osmDefaults" : {
+    "timeZone" : "Europe/Madrid",
+    "osmTagMapping" : "default"
+  },
+  "osm" : [
+    {
+      "source" : "cataluna-latest.osm.pbf",
+      "timeZone" : "Europe/Madrid",
+      "osmTagMapping" : "default"
+    }
+  ]
+}
