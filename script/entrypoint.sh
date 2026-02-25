@@ -194,7 +194,7 @@ ACTION="$1"
 
 set -u
 
-CONFIG_FILES_PATH="${CONFIG_FILES_PATH:-"/app/config"}"
+CONFIG_FILES_PATH="${CONFIG_FILES_PATH:-"/app/config/${ENVIRONMENT}"}"
 OSM_FILE_NAME="${OSM_FILE_NAME:-"base"}"
 S3_BUCKET="${S3_BUCKET:-"shotl-maps"}"
 OSM_DIR="${OSM_DIR:-"osm"}"
