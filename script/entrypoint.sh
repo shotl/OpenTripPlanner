@@ -107,9 +107,7 @@ function print_help {
 }
 
 # validate required env variables
-validate_required_env "ENV" || exit 1
-
-ENVIRONMENT=$ENV
+validate_required_env "ENVIRONMENT" || exit 1
 
 POSITIONAL=()
 

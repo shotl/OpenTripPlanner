@@ -1,5 +1,5 @@
 app:
-  command: ["--max-memory", "2", "--config-files-path", "/app/config", "serve"]
+  command: ["--max-memory", "2", "serve"]
 
   resources:
     limits:

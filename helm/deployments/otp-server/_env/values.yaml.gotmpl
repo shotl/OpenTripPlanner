@@ -61,7 +61,7 @@ app:
         sizeLimit: 5Gi
 
   environment:
-    ENV: "{{ .Environment.envName }}"
+    ENVIRONMENT: "{{ .Environment.envName }}"
     NEW_RELIC_APP_NAME: "{{ .App.Name }}-{{ .Environment.envShort }}"
     NEW_RELIC_LABELS: "env:{{ .Environment.envName }};service:{{ .App.Name }};version:$(APP_VERSION)"
     NEW_RELIC_ENABLED: true
