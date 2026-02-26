@@ -22,61 +22,68 @@ env:
   LOG_LEVEL: info
 
 jobs:
-  argocd-app-stg:
-    if: endsWith(github.ref, '/feature/drt-mode')
-    environment: Staging
+  # ───────────────────────────────────────────────────────────────
+  # 1. Determine target environment from the Git ref
+  # ───────────────────────────────────────────────────────────────
+  resolve-env:
     runs-on: ubuntu-latest
-    container:
-      image: 177029646271.dkr.ecr.eu-west-1.amazonaws.com/shotool:v3.0.0
-      credentials:
-        username: AWS
-        password: ${{ secrets.AWS_ECR_PASSWORD }}
+    outputs:
+      environment: ${{ steps.resolve.outputs.environment }}
+      env_short: ${{ steps.resolve.outputs.env_short }}
+      app_version: ${{ steps.resolve.outputs.app_version }}
+      is_build_tag: ${{ steps.resolve.outputs.is_build_tag }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set deployment environment variables
+      - name: Resolve deployment target
+        id: resolve
         run: |
-          echo "ENVIRONMENT=staging" >> "$GITHUB_ENV"
-          echo "ENV_SHORT=stg" >> "$GITHUB_ENV"
-          echo "ARGOCD_SERVER=argocd.stg.euw1.shotl.com" >> "$GITHUB_ENV"
-          echo "EKS_CLUSTER_NAME=shotl-stg_euw1_k8s-shotl_eks" >> "$GITHUB_ENV"
-          echo "EKS_CLUSTER_ALIAS=shotl-stg" >> "$GITHUB_ENV"
-          echo "APP_VERSION=stg-${GITHUB_SHA::8}" >> "$GITHUB_ENV"
-
-      - name: Deploy
-        run: |
-          ARGS="--app-version ${{ env.APP_VERSION }} --build --image-repository otp"
-          shotool deploy ${ARGS}
-
-  argocd-app-prod:
-    if: contains(github.ref, '/tags/')
-    environment: Production
-    runs-on: ubuntu-latest
-    container:
-      image: 177029646271.dkr.ecr.eu-west-1.amazonaws.com/shotool:v3.0.0
-      credentials:
-        username: AWS
-        password: ${{ secrets.AWS_ECR_PASSWORD }}
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set deployment environment variables
-        run: |
-          echo "ENVIRONMENT=production" >> "$GITHUB_ENV"
-          echo "ENV_SHORT=prod" >> "$GITHUB_ENV"
-          echo "ARGOCD_SERVER=argocd.prod.euw1.shotl.com" >> "$GITHUB_ENV"
-          echo "EKS_CLUSTER_NAME=shotl-prod_euw1_k8s-shotl_eks" >> "$GITHUB_ENV"
-          echo "EKS_CLUSTER_ALIAS=shotl-prod" >> "$GITHUB_ENV"
-          echo "APP_VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_ENV"
-          # Check if this is a -build tagged version
-          if [[ "${{ env.APP_VERSION }}" == *"-build" ]]; then
-            echo "IS_BUILD_TAG=true" >> "$GITHUB_ENV"
-            echo "DOCKER_TAG=otp:${APP_VERSION}" >> "$GITHUB_ENV"
+          if [[ "${GITHUB_REF}" == */feature/drt-mode ]]; then
+            echo "environment=Staging"  >> "$GITHUB_OUTPUT"
+            echo "env_short=stg"        >> "$GITHUB_OUTPUT"
+            echo "app_version=stg-${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+            echo "is_build_tag=false" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_REF}" == */tags/* ]]; then
+            echo "environment=Production" >> "$GITHUB_OUTPUT"
+            echo "env_short=prod"         >> "$GITHUB_OUTPUT"
+            echo "app_version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            if [[ "${{ env.APP_VERSION }}" == *"-build" ]]; then
+              echo "is_build_tag=true" >> "$GITHUB_OUTPUT"
+              echo "DOCKER_TAG=otp:${APP_VERSION}" >> "$GITHUB_ENV"
+            else
+              echo "is_build_tag=false" >> "$GITHUB_OUTPUT"
+            fi
           else
-            echo "IS_BUILD_TAG=false" >> "$GITHUB_ENV"
+            echo "::error::Unsupported ref '${GITHUB_REF}' — expected feature/drt-mode branch or tag"
+            exit 1
           fi
+
+  # ───────────────────────────────────────────────────────────────
+  # 2. Build (optional) & deploy via shotool
+  # ───────────────────────────────────────────────────────────────
+  deploy:
+    needs: resolve-env
+    runs-on: ubuntu-latest
+    container:
+      image: 177029646271.dkr.ecr.eu-west-1.amazonaws.com/shotool:v3.0.1
+      credentials:
+        username: AWS
+        password: ${{ secrets.AWS_ECR_PASSWORD }}
+    environment: ${{ needs.resolve-env.outputs.environment }}
+    concurrency:
+      group: deploy-${{ github.repository }}-${{ needs.resolve-env.outputs.environment }}
+      cancel-in-progress: false
+    env:
+      # ArgoCD / Kubernetes (sourced from org/repo variables) -----
+      ARGOCD_SERVER: ${{ needs.resolve-env.outputs.environment == 'Staging' && vars.ARGOCD_SERVER_STAGING || vars.ARGOCD_SERVER_PRODUCTION }}
+      EKS_CLUSTER_NAME: ${{ needs.resolve-env.outputs.environment == 'Staging' && vars.EKS_CLUSTER_NAME_STAGING || vars.EKS_CLUSTER_NAME_PRODUCTION }}
+      EKS_CLUSTER_ALIAS: ${{ needs.resolve-env.outputs.environment == 'Staging' && vars.EKS_CLUSTER_ALIAS_STAGING || vars.EKS_CLUSTER_ALIAS_PRODUCTION }}
+      # Application ----------------------------------------------------
+      ENVIRONMENT: ${{ needs.resolve-env.outputs.env_short == 'stg' && 'staging' || 'production' }}
+      ENV_SHORT: ${{ needs.resolve-env.outputs.env_short }}
+      APP_VERSION: ${{ needs.resolve-env.outputs.app_version }}
+      IS_BUILD_TAG: ${{ needs.resolve-env.outputs.is_build_tag }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
 
       - name: Login to ECR
         if: env.IS_BUILD_TAG == 'true'
