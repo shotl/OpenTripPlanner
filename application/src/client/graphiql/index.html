@@ -1,20 +1,20 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <style>
-    body {
-      height: 100%;
-      margin: 0;
-      width: 100%;
-      overflow: hidden;
-    }
+  <head>
+    <style>
+      body {
+        height: 100%;
+        margin: 0;
+        width: 100%;
+        overflow: hidden;
+      }
 
-    #graphiql {
-      height: 100vh;
-    }
-  </style>
+      #graphiql {
+        height: 100vh;
+      }
+    </style>
 
-  <!--
+    <!--
     This GraphiQL example depends on Promise and fetch, which are available in
     modern browsers, but can be "polyfilled" for older browsers.
     GraphiQL itself depends on React DOM.
@@ -22,25 +22,42 @@
     include them directly in your favored resource bundler.
   -->
 
-  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js" integrity="sha256-hXNk4rmCMYQXAl+5tLg1XAn3X6RroL6T9SD3afZ1eng=" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js" integrity="sha256-bRHakm3eFVwNh3OuDgW7ZGg/H0DU4etihxfdhJkXIoI=" crossorigin="anonymous"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"
+      integrity="sha256-hXNk4rmCMYQXAl+5tLg1XAn3X6RroL6T9SD3afZ1eng="
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"
+      integrity="sha256-bRHakm3eFVwNh3OuDgW7ZGg/H0DU4etihxfdhJkXIoI="
+      crossorigin="anonymous"
+    ></script>
 
-  <!--
+    <!--
     These two files can be found in the npm module, however you may wish to
     copy them directly into your environment, or perhaps include them in your
     favored resource bundler.
    -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/graphiql@3.8.3/graphiql.min.css" integrity="sha256-sYaCR/jgUCzYaeWB9fPLVbM0hi5/UbHWy6zhEFm5rcI=" crossorigin="anonymous">
-  <title>OTP GraphQL Explorer</title>
-</head>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/graphiql@3.8.3/graphiql.min.css"
+      integrity="sha256-sYaCR/jgUCzYaeWB9fPLVbM0hi5/UbHWy6zhEFm5rcI="
+      crossorigin="anonymous"
+    />
+    <title>OTP GraphQL Explorer</title>
+  </head>
 
-<body>
-<div id="graphiql">Loading...</div>
+  <body>
+    <div id="graphiql">Loading...</div>
 
-<script src="https://cdn.jsdelivr.net/npm/graphiql@3.8.3/graphiql.min.js" integrity="sha256-IvqrlAZ7aV5feVlhn75obrzIlVACoMl9mGvLukrUvCw=" crossorigin="anonymous"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/graphiql@3.8.3/graphiql.min.js"
+      integrity="sha256-IvqrlAZ7aV5feVlhn75obrzIlVACoMl9mGvLukrUvCw="
+      crossorigin="anonymous"
+    ></script>
 
-<script>
-  const gtfsExampleQuery = `
+    <script>
+      const gtfsExampleQuery = `
 # This is an example query for fetching all routes of your OTP deployment.
 # Click on the documentation icon on the left to read about the available types
 # or use autocomplete to explore the schema.
@@ -51,7 +68,7 @@ query GtfsExampleQuery {
   }
 }
 `;
-  const transmodelExampleQuery = `
+      const transmodelExampleQuery = `
 # This is an example query for fetching the OTP version and a trip. Change the
 # coordinates to fit your OTP deployment.
 query TransmodelExampleQuery {
@@ -84,138 +101,153 @@ query TransmodelExampleQuery {
     }
   }
 }
-`
+`;
 
-  // Parse the search string to get url parameters.
-  var search = window.location.search;
-  var parameters = {};
-  search
-          .substr(1)
-          .split('&')
-          .forEach(function(entry) {
-            var eq = entry.indexOf('=');
-            if (eq >= 0) {
-              parameters[decodeURIComponent(entry.slice(0, eq))] = decodeURIComponent(
-                      entry.slice(eq + 1),
-              );
-            }
+      // Parse the search string to get url parameters.
+      var search = window.location.search;
+      var parameters = {};
+      search
+        .substr(1)
+        .split("&")
+        .forEach(function (entry) {
+          var eq = entry.indexOf("=");
+          if (eq >= 0) {
+            parameters[decodeURIComponent(entry.slice(0, eq))] =
+              decodeURIComponent(entry.slice(eq + 1));
+          }
+        });
+
+      // If variables was provided, try to format it.
+      if (parameters.variables) {
+        try {
+          parameters.variables = JSON.stringify(
+            JSON.parse(parameters.variables),
+            null,
+            2,
+          );
+        } catch (e) {
+          // Do nothing, we want to display the invalid JSON as a string, rather
+          // than present an error.
+        }
+      }
+
+      // When the query and variables string is edited, update the URL bar so
+      // that it can be easily shared.
+      function onEditQuery(newQuery) {
+        parameters.query = newQuery;
+        updateURL();
+      }
+
+      function onEditVariables(newVariables) {
+        parameters.variables = newVariables;
+        updateURL();
+      }
+
+      function onEditOperationName(newOperationName) {
+        parameters.operationName = newOperationName;
+        updateURL();
+      }
+
+      function onEditHeaders(headers) {
+        parameters.headers = headers;
+        updateURL();
+      }
+
+      function updateURL() {
+        if (
+          parameters["query"] !== gtfsExampleQuery &&
+          parameters["query"] !== transmodelExampleQuery
+        ) {
+          var newSearch =
+            "?" +
+            Object.keys(parameters)
+              .filter(function (key) {
+                return Boolean(parameters[key]);
+              })
+              .map(function (key) {
+                return (
+                  encodeURIComponent(key) +
+                  "=" +
+                  encodeURIComponent(parameters[key])
+                );
+              })
+              .join("&");
+          history.replaceState(null, null, newSearch);
+        }
+      }
+
+      let apiFlavor = parameters.flavor || "gtfs";
+      let urls = {
+        gtfs: "/otp/gtfs/v1",
+        transmodel: "/otp/transmodel/v3",
+      };
+
+      let defaultQueries = {
+        gtfs: gtfsExampleQuery,
+        transmodel: transmodelExampleQuery,
+      };
+
+      let updateFlavor = (e) => {
+        apiFlavor = e.target.value;
+        console.log(`Setting API flavor to '${apiFlavor}'`);
+        history.pushState(null, null, `?flavor=${apiFlavor}`);
+        window.location.reload();
+      };
+
+      function graphQLFetcher(query, { headers }) {
+        const defaultHeaders = {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        };
+        const mergedHeaders = Object.assign({}, defaultHeaders, headers);
+        return fetch(urls[apiFlavor], {
+          method: "post",
+          headers: mergedHeaders,
+          body: JSON.stringify(query),
+          credentials: "same-origin",
+        }).then(function (response) {
+          return response.json().catch(function () {
+            return response.text();
           });
+        });
+      }
 
-  // If variables was provided, try to format it.
-  if (parameters.variables) {
-    try {
-      parameters.variables = JSON.stringify(
-              JSON.parse(parameters.variables),
-              null,
-              2,
+      const header = React.createElement(
+        "a",
+        { className: "graphiql-logo-link" },
+        "OTP GraphQL Explorer ",
       );
-    } catch (e) {
-      // Do nothing, we want to display the invalid JSON as a string, rather
-      // than present an error.
-    }
-  }
-
-  // When the query and variables string is edited, update the URL bar so
-  // that it can be easily shared.
-  function onEditQuery(newQuery) {
-    parameters.query = newQuery;
-    updateURL();
-  }
-
-  function onEditVariables(newVariables) {
-    parameters.variables = newVariables;
-    updateURL();
-  }
-
-  function onEditOperationName(newOperationName) {
-    parameters.operationName = newOperationName;
-    updateURL();
-  }
-
-  function onEditHeaders(headers) {
-    parameters.headers = headers;
-    updateURL();
-  }
-
-  function updateURL() {
-    if(parameters["query"] !== gtfsExampleQuery && parameters["query"] !== transmodelExampleQuery) {
-
-      var newSearch =
-              '?' +
-              Object.keys(parameters)
-                      .filter(function(key) {
-                        return Boolean(parameters[key]);
-                      })
-                      .map(function(key) {
-                        return (
-                                encodeURIComponent(key) + '=' + encodeURIComponent(parameters[key])
-                        );
-                      })
-                      .join('&');
-      history.replaceState(null, null, newSearch);
-    }
-  }
-
-  let apiFlavor = parameters.flavor || "gtfs";
-  let urls = {
-    gtfs: '/otp/gtfs/v1',
-    transmodel: '/otp/transmodel/v3'
-  }
-
-  let defaultQueries = {
-    gtfs: gtfsExampleQuery,
-    transmodel: transmodelExampleQuery
-  }
-
-  let updateFlavor = (e) => {
-    apiFlavor = e.target.value;
-    console.log(`Setting API flavor to '${apiFlavor}'`);
-    history.pushState(null, null, `?flavor=${apiFlavor}`);
-    window.location.reload();
-  };
-
-  function graphQLFetcher(query, { headers }) {
-    const defaultHeaders = {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    }
-    const mergedHeaders = Object.assign({}, defaultHeaders, headers);
-    return fetch(
-            urls[apiFlavor],
-            {
-              method: 'post',
-              headers: mergedHeaders,
-              body: JSON.stringify(query),
-              credentials: 'omit',
-            },
-    ).then(function (response) {
-      return response.json().catch(function () {
-        return response.text();
-      });
-    });
-  }
-
-  const header = React.createElement("a", { className: "graphiql-logo-link" }, "OTP GraphQL Explorer ");
-  const select = React.createElement("select", { onChange: updateFlavor, value: apiFlavor }, [
+      const select = React.createElement(
+        "select",
+        { onChange: updateFlavor, value: apiFlavor },
+        [
           React.createElement("option", { key: "gtfs", value: "gtfs" }, "GTFS"),
-          React.createElement("option", { key: "transmodel", value: "transmodel" }, "Transmodel")
-  ]);
+          React.createElement(
+            "option",
+            { key: "transmodel", value: "transmodel" },
+            "Transmodel",
+          ),
+        ],
+      );
 
-  var graphiql = React.createElement(GraphiQL, {
-            fetcher: graphQLFetcher,
-            defaultVariableEditorOpen: true,
-            query: parameters.query || defaultQueries[apiFlavor],
-            variables: parameters.variables,
-            headers: parameters.headers,
-            operationName: parameters.operationName,
-            onEditQuery: onEditQuery,
-            onEditVariables: onEditVariables,
-            onEditOperationName: onEditOperationName,
-            onEditHeaders: onEditHeaders,
-            defaultEditorToolsVisibility: true
-          },
-          React.createElement(GraphiQL.Logo, {}, [header, select]));
-  ReactDOM.render(graphiql, document.getElementById('graphiql'));
-</script>
-</body>
+      var graphiql = React.createElement(
+        GraphiQL,
+        {
+          fetcher: graphQLFetcher,
+          defaultVariableEditorOpen: true,
+          query: parameters.query || defaultQueries[apiFlavor],
+          variables: parameters.variables,
+          headers: parameters.headers,
+          operationName: parameters.operationName,
+          onEditQuery: onEditQuery,
+          onEditVariables: onEditVariables,
+          onEditOperationName: onEditOperationName,
+          onEditHeaders: onEditHeaders,
+          defaultEditorToolsVisibility: true,
+        },
+        React.createElement(GraphiQL.Logo, {}, [header, select]),
+      );
+      ReactDOM.render(graphiql, document.getElementById("graphiql"));
+    </script>
+  </body>
 </html>
