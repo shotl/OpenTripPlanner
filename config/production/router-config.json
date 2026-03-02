@@ -3,7 +3,7 @@
         {
             "type": "shotl-demand-responsive-transportation",
             "enabled": true,
-            "estimationsURL": "http://rides.shotl.aws:80/",
+            "estimationsURL": "http://rides-api.shotl.svc.cluster.local/",
             "providerName": "Shotl"
         }
     ]
