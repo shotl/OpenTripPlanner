@@ -7,6 +7,7 @@ import java.util.Locale;
 import javax.annotation.Nullable;
 import org.opentripplanner.astar.spi.TraverseVisitor;
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationService;
+import org.opentripplanner.ext.demandresponsivetransportation.PerRequestDemandResponsiveTransportationService;
 import org.opentripplanner.ext.emissions.EmissionsService;
 import org.opentripplanner.ext.flex.FlexParameters;
 import org.opentripplanner.ext.geocoder.LuceneIndex;
@@ -119,7 +120,14 @@ public class DefaultServerRequestContext implements OtpServerRequestContext {
     this.raptorConfig = raptorConfig;
     this.realtimeVehicleService = realtimeVehicleService;
     this.rideHailingServices = rideHailingServices;
-    this.demandResponsiveTransportationServices = demandResponsiveTransportationServices;
+    this.demandResponsiveTransportationServices = demandResponsiveTransportationServices
+      .stream()
+      .map(s ->
+        (DemandResponsiveTransportationService) new PerRequestDemandResponsiveTransportationService(
+          s
+        )
+      )
+      .toList();
     this.routeRequestDefaults = routeRequestDefaults;
     this.streetLimitationParametersService = streetLimitationParametersService;
     this.transitRoutingConfig = transitRoutingConfig;

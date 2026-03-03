@@ -10,6 +10,7 @@ import org.opentripplanner.framework.geometry.WgsCoordinate;
  * to increase cache hit rate. Pickup time is rounded to 5-minute intervals.
  */
 public record DrtEstimateRequest(
+  String userId,
   String areaId,
   String rideType,
   WgsCoordinate startPosition,
@@ -22,6 +23,7 @@ public record DrtEstimateRequest(
    * Creates a cache key with coordinates rounded to ~10m and pickup time rounded to 5 minutes.
    */
   public static DrtEstimateRequest create(
+    String userId,
     String areaId,
     String rideType,
     WgsCoordinate from,
@@ -35,6 +37,7 @@ public record DrtEstimateRequest(
     long roundedPickupTime = (pickupTimeSeconds / 300) * 300; // 300 seconds = 5 minutes
 
     return new DrtEstimateRequest(
+      userId,
       areaId,
       rideType,
       from.roundToApproximate10m(),

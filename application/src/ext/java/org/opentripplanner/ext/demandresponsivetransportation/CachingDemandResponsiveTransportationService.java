@@ -1,8 +1,5 @@
 package org.opentripplanner.ext.demandresponsivetransportation;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import java.time.Duration;
 import java.time.Instant;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlBusinessRejectionException;
@@ -11,10 +8,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A base class for caching API responses from demand responsive transportation services.
+ * A base class for demand responsive transportation services that handles logging and error
+ * handling for API calls.
  * <p>
- * Similar to {@link org.opentripplanner.ext.ridehailing.CachingRideHailingService}, this class
- * wraps DRT API calls with a Guava cache to reduce redundant API requests during routing.
+ * Caching is handled externally by {@link PerRequestDemandResponsiveTransportationService}, which
+ * wraps instances of this class with a fresh per-request cache to prevent stale results from being
+ * shared across GraphQL requests.
  */
 public abstract class CachingDemandResponsiveTransportationService
   implements DemandResponsiveTransportationService {
@@ -23,19 +22,6 @@ public abstract class CachingDemandResponsiveTransportationService
     CachingDemandResponsiveTransportationService.class
   );
 
-  // Cache duration for DRT estimates. DRT services typically have more dynamic availability
-  // than ride-hailing, so we use a shorter cache duration.
-  private static final Duration CACHE_DURATION = Duration.ofMinutes(2);
-
-  private final Cache<DrtEstimateRequest, ShotlArrivalEstimateResponse> estimateCache =
-    CacheBuilder.newBuilder().expireAfterWrite(CACHE_DURATION).build();
-
-  /**
-   * Get the arrival time estimate for a DRT request.
-   * <p>
-   * Results are cached based on a composite key of area, ride type, rounded coordinates,
-   * passengers, and rounded pickup time to reduce API calls.
-   */
   @Override
   public ShotlArrivalEstimateResponse arrivalTimes(
     String paxAppId,
@@ -49,34 +35,8 @@ public abstract class CachingDemandResponsiveTransportationService
     Instant desiredPickupTime,
     DrtRequestContext context
   ) {
-    var cacheKey = DrtEstimateRequest.create(
-      areaId,
-      rideType,
-      fromCoordinate,
-      toCoordinate,
-      regularPassengers,
-      wheelchairPassengers,
-      desiredPickupTime
-    );
-
-    // Check if we have a cached response
-    var cachedResponse = estimateCache.getIfPresent(cacheKey);
-    if (cachedResponse != null) {
-      LOG.debug(
-        "[DRT] CACHE HIT | context={} | areaId={} | from=({},{}) | to=({},{}) | pickupTime={}",
-        context,
-        areaId,
-        fromCoordinate.latitude(),
-        fromCoordinate.longitude(),
-        toCoordinate.latitude(),
-        toCoordinate.longitude(),
-        desiredPickupTime
-      );
-      return cachedResponse;
-    }
-
     LOG.info(
-      "[DRT] CACHE MISS | context={} | areaId={} | from=({},{}) | to=({},{}) | pickupTime={} | " +
+      "[DRT] API CALL | context={} | areaId={} | from=({},{}) | to=({},{}) | pickupTime={} | " +
       "fetching from API...",
       context,
       areaId,
@@ -88,19 +48,17 @@ public abstract class CachingDemandResponsiveTransportationService
     );
 
     try {
-      var response = estimateCache.get(cacheKey, () ->
-        queryArrivalTimes(
-          paxAppId,
-          areaId,
-          userId,
-          rideType,
-          fromCoordinate,
-          toCoordinate,
-          regularPassengers,
-          wheelchairPassengers,
-          desiredPickupTime,
-          context
-        )
+      var response = queryArrivalTimes(
+        paxAppId,
+        areaId,
+        userId,
+        rideType,
+        fromCoordinate,
+        toCoordinate,
+        regularPassengers,
+        wheelchairPassengers,
+        desiredPickupTime,
+        context
       );
 
       LOG.info(
@@ -114,29 +72,22 @@ public abstract class CachingDemandResponsiveTransportationService
       );
 
       return response;
+    } catch (ShotlBusinessRejectionException rejection) {
+      LOG.warn(
+        "[DRT] API BUSINESS REJECTION | context={} | areaId={} | code={} | message={}",
+        context,
+        areaId,
+        rejection.getCode(),
+        rejection.getMessage()
+      );
+      return null;
     } catch (Exception e) {
-      // All errors are handled gracefully — return null so callers can skip this leg
-      // without failing the entire routing request.
-      // Note: Guava Cache.get() wraps checked exceptions in ExecutionException and
-      // unchecked exceptions (RuntimeException) in UncheckedExecutionException, so we
-      // catch Exception to handle both cases.
-      var cause = e.getCause();
-      if (cause instanceof ShotlBusinessRejectionException rejection) {
-        LOG.warn(
-          "[DRT] API BUSINESS REJECTION | context={} | areaId={} | code={} | message={}",
-          context,
-          areaId,
-          rejection.getCode(),
-          rejection.getMessage()
-        );
-      } else {
-        LOG.error(
-          "[DRT] API ERROR | context={} | areaId={} | error={}",
-          context,
-          areaId,
-          e.getMessage()
-        );
-      }
+      LOG.error(
+        "[DRT] API ERROR | context={} | areaId={} | error={}",
+        context,
+        areaId,
+        e.getMessage()
+      );
       return null;
     }
   }
