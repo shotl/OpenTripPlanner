@@ -37,7 +37,7 @@ import org.slf4j.Logger;
  * The default connection time-to-live is set to 1 minute.
  * <h3>Connection Pooling</h3>
  * The connection pool holds by default a maximum of 25 connections, with maximum 5 connections
- * per host.
+ * per host (configurable via {@code maxConnPerRoute}).
  *
  * <h3>Thread-safety</h3>
  * Instances of this class are thread-safe.
@@ -52,6 +52,11 @@ public class OtpHttpClientFactory implements AutoCloseable {
    * see {@link PoolingHttpClientConnectionManager#DEFAULT_MAX_TOTAL_CONNECTIONS}
    */
   public static final int DEFAULT_MAX_TOTAL_CONNECTIONS = 25;
+
+  /**
+   * Default maximum number of connections per route (host).
+   */
+  public static final int DEFAULT_MAX_CONN_PER_ROUTE = 5;
 
   private final CloseableHttpClient httpClient;
 
@@ -68,7 +73,7 @@ public class OtpHttpClientFactory implements AutoCloseable {
    * number of connections.
    */
   public OtpHttpClientFactory(int maxConnections) {
-    this(DEFAULT_TIMEOUT, DEFAULT_TTL, maxConnections);
+    this(DEFAULT_TIMEOUT, DEFAULT_TTL, maxConnections, DEFAULT_MAX_CONN_PER_ROUTE);
   }
 
   /**
@@ -76,13 +81,26 @@ public class OtpHttpClientFactory implements AutoCloseable {
    * number of connections.
    */
   public OtpHttpClientFactory(Duration timeout, Duration connectionTtl) {
-    this(timeout, connectionTtl, DEFAULT_MAX_TOTAL_CONNECTIONS);
+    this(timeout, connectionTtl, DEFAULT_MAX_TOTAL_CONNECTIONS, DEFAULT_MAX_CONN_PER_ROUTE);
+  }
+
+  /**
+   * Creates an HTTP client with custom total connections and per-route (per-host) limits.
+   * Use this when making many parallel requests to the same host.
+   */
+  public OtpHttpClientFactory(int maxConnections, int maxConnPerRoute) {
+    this(DEFAULT_TIMEOUT, DEFAULT_TTL, maxConnections, maxConnPerRoute);
   }
 
   /**
    * Creates an HTTP client with custom configuration.
    */
-  private OtpHttpClientFactory(Duration timeout, Duration connectionTtl, int maxConnections) {
+  private OtpHttpClientFactory(
+    Duration timeout,
+    Duration connectionTtl,
+    int maxConnections,
+    int maxConnPerRoute
+  ) {
     Objects.requireNonNull(timeout);
     Objects.requireNonNull(connectionTtl);
 
@@ -92,6 +110,7 @@ public class OtpHttpClientFactory implements AutoCloseable {
         .setPoolConcurrencyPolicy(PoolConcurrencyPolicy.STRICT)
         .setConnPoolPolicy(PoolReusePolicy.LIFO)
         .setMaxConnTotal(maxConnections)
+        .setMaxConnPerRoute(maxConnPerRoute)
         .setDefaultConnectionConfig(
           ConnectionConfig.custom()
             .setSocketTimeout(Timeout.of(timeout))

@@ -14,7 +14,6 @@ import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTr
 import org.opentripplanner.ext.demandresponsivetransportation.DrtRequestContext;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
 import org.opentripplanner.framework.io.OtpHttpClient;
-import org.opentripplanner.framework.io.OtpHttpClientFactory;
 import org.opentripplanner.framework.json.ObjectMappers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,18 +27,31 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
   private static final String DEFAULT_TIME_ESTIMATE_PATH = "v3/drt/time-estimations";
   private static final ObjectMapper MAPPER = ObjectMappers.ignoringExtraFields();
 
+  /**
+   * HTTP request timeout for Shotl API calls. Kept short to avoid blocking connection pool
+   * threads when the Shotl service is slow or unresponsive.
+   */
+  private static final Duration API_TIMEOUT = Duration.ofSeconds(60);
+
   private final String timeEstimateUri;
 
   private final OtpHttpClient otpHttpClient;
 
-  public ShotlService(DemandResponsiveTransportationServiceParameters config) {
-    this(config.estimationsURL(), DEFAULT_TIME_ESTIMATE_PATH);
+  /**
+   * Creates a ShotlService with the given config and a shared HTTP client.
+   * The HTTP client should be created once and shared across all ShotlService instances
+   * to benefit from connection pooling.
+   */
+  public ShotlService(
+    DemandResponsiveTransportationServiceParameters config,
+    OtpHttpClient otpHttpClient
+  ) {
+    this(config.estimationsURL(), DEFAULT_TIME_ESTIMATE_PATH, otpHttpClient);
   }
 
-  ShotlService(String baseUrl, String timeEstimateUri) {
+  ShotlService(String baseUrl, String timeEstimateUri, OtpHttpClient otpHttpClient) {
     this.timeEstimateUri = baseUrl + timeEstimateUri;
-
-    this.otpHttpClient = new OtpHttpClientFactory().create(LOG);
+    this.otpHttpClient = otpHttpClient;
   }
 
   @Override
@@ -111,7 +123,7 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
       apiResponse = otpHttpClient.postJsonAndMap(
         uri,
         jsonBody,
-        Duration.ofSeconds(60),
+        API_TIMEOUT,
         headers(paxAppId),
         is -> {
           try {
