@@ -688,20 +688,58 @@ public class GraphQLTypes {
     SHORTEST_DURATION,
   }
 
+  public static class GraphQLDrtPassengerFareTypeInput {
+
+    private String type;
+    private Integer count;
+
+    public GraphQLDrtPassengerFareTypeInput(Map<String, Object> args) {
+      if (args != null) {
+        this.type = (String) args.get("type");
+        this.count = (Integer) args.get("count");
+      }
+    }
+
+    public String getGraphQLType() {
+      return this.type;
+    }
+
+    public Integer getGraphQLCount() {
+      return this.count;
+    }
+
+    public void setGraphQLType(String type) {
+      this.type = type;
+    }
+
+    public void setGraphQLCount(Integer count) {
+      this.count = count;
+    }
+  }
+
   public static class GraphQLDrtInput {
 
     private String areaId;
     private GraphQLDrtPassengersInput passengers;
+    private List<GraphQLDrtPassengerFareTypeInput> passengerFareType;
     private String paxAppId;
     private String rideType;
     private String userId;
 
+    @SuppressWarnings("unchecked")
     public GraphQLDrtInput(Map<String, Object> args) {
       if (args != null) {
         this.areaId = (String) args.get("areaId");
         this.passengers = new GraphQLDrtPassengersInput(
           (Map<String, Object>) args.get("passengers")
         );
+        if (args.get("passengerFareType") != null) {
+          this.passengerFareType = ((List<Map<String, Object>>) args.get(
+              "passengerFareType"
+            )).stream()
+            .map(GraphQLDrtPassengerFareTypeInput::new)
+            .collect(java.util.stream.Collectors.toList());
+        }
         this.paxAppId = (String) args.get("paxAppId");
         this.rideType = (String) args.get("rideType");
         this.userId = (String) args.get("userId");
@@ -714,6 +752,10 @@ public class GraphQLTypes {
 
     public GraphQLDrtPassengersInput getGraphQLPassengers() {
       return this.passengers;
+    }
+
+    public List<GraphQLDrtPassengerFareTypeInput> getGraphQLPassengerFareType() {
+      return this.passengerFareType;
     }
 
     public String getGraphQLPaxAppId() {
@@ -734,6 +776,12 @@ public class GraphQLTypes {
 
     public void setGraphQLPassengers(GraphQLDrtPassengersInput passengers) {
       this.passengers = passengers;
+    }
+
+    public void setGraphQLPassengerFareType(
+      List<GraphQLDrtPassengerFareTypeInput> passengerFareType
+    ) {
+      this.passengerFareType = passengerFareType;
     }
 
     public void setGraphQLPaxAppId(String paxAppId) {

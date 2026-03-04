@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.ws.rs.core.UriBuilder;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import org.opentripplanner.ext.demandresponsivetransportation.CachingDemandResponsiveTransportationService;
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationServiceParameters;
@@ -15,6 +16,7 @@ import org.opentripplanner.ext.demandresponsivetransportation.DrtRequestContext;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
 import org.opentripplanner.framework.io.OtpHttpClient;
 import org.opentripplanner.framework.json.ObjectMappers;
+import org.opentripplanner.routing.api.request.PassengerFareType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +67,8 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
     int regularPassengers,
     int wheelchairPassengers,
     Instant desiredPickupTime,
-    DrtRequestContext context
+    DrtRequestContext context,
+    List<PassengerFareType> passengerFareType
   ) {
     var uri = UriBuilder.fromUri(timeEstimateUri).build();
 
@@ -95,6 +98,15 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
       desiredPickupTime != null ? desiredPickupTime.getEpochSecond() : null,
       null // desiredDropoffTime not provided in current interface
     );
+
+    // Set optional passenger fare types for pricing calculation
+    if (passengerFareType != null && !passengerFareType.isEmpty()) {
+      var fareTypeInputs = passengerFareType
+        .stream()
+        .map(ft -> new ShotlTimeEstimateRequest.PassengerFareTypeInput(ft.type(), ft.count()))
+        .collect(java.util.stream.Collectors.toList());
+      request.setPassengerFareType(fareTypeInputs);
+    }
 
     // Convert request to JsonNode
     var jsonBody = MAPPER.valueToTree(request);

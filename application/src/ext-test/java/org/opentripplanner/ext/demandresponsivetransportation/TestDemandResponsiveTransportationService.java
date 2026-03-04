@@ -2,8 +2,10 @@ package org.opentripplanner.ext.demandresponsivetransportation;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
+import org.opentripplanner.routing.api.request.PassengerFareType;
 
 /**
  * A test implementation of DemandResponsiveTransportationService that returns configurable
@@ -35,7 +37,8 @@ public class TestDemandResponsiveTransportationService
     int regularPassengers,
     int wheelchairPassengers,
     Instant desiredPickupTime,
-    DrtRequestContext context
+    DrtRequestContext context,
+    List<PassengerFareType> passengerFareType
   ) {
     // Calculate expected pickup time by adding arrival delay to desired pickup time
     long userExpectedPickupTime = desiredPickupTime.plus(arrivalDelay).getEpochSecond();

@@ -16,6 +16,7 @@ import org.opentripplanner.apis.gtfs.generated.GraphQLTypes;
 import org.opentripplanner.framework.graphql.GraphQLUtils;
 import org.opentripplanner.model.GenericLocation;
 import org.opentripplanner.routing.api.request.DemandResponsiveExtData;
+import org.opentripplanner.routing.api.request.PassengerFareType;
 import org.opentripplanner.routing.api.request.Passengers;
 import org.opentripplanner.routing.api.request.RouteRequest;
 import org.opentripplanner.routing.api.request.preference.ItineraryFilterPreferences;
@@ -199,6 +200,14 @@ public class RouteRequestMapper {
     }
 
     var passengers = drtInput.getGraphQLPassengers();
+    var fareTypeInputs = drtInput.getGraphQLPassengerFareType();
+    List<PassengerFareType> passengerFareTypes = null;
+    if (fareTypeInputs != null && !fareTypeInputs.isEmpty()) {
+      passengerFareTypes = fareTypeInputs
+        .stream()
+        .map(ft -> new PassengerFareType(ft.getGraphQLType(), ft.getGraphQLCount()))
+        .collect(java.util.stream.Collectors.toList());
+    }
     request.setDemandResponsiveExtData(
       new DemandResponsiveExtData(
         drtInput.getGraphQLPaxAppId(),
@@ -207,7 +216,8 @@ public class RouteRequestMapper {
         drtInput.getGraphQLRideType(),
         passengers != null
           ? new Passengers(passengers.getGraphQLRegular(), passengers.getGraphQLWheelchair())
-          : null
+          : null,
+        passengerFareTypes
       )
     );
   }

@@ -1,9 +1,11 @@
 package org.opentripplanner.ext.demandresponsivetransportation;
 
 import java.time.Instant;
+import java.util.List;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlBusinessRejectionException;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
+import org.opentripplanner.routing.api.request.PassengerFareType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +35,8 @@ public abstract class CachingDemandResponsiveTransportationService
     int regularPassengers,
     int wheelchairPassengers,
     Instant desiredPickupTime,
-    DrtRequestContext context
+    DrtRequestContext context,
+    List<PassengerFareType> passengerFareType
   ) {
     LOG.info(
       "[DRT] API CALL | context={} | areaId={} | from=({},{}) | to=({},{}) | pickupTime={} | " +
@@ -58,7 +61,8 @@ public abstract class CachingDemandResponsiveTransportationService
         regularPassengers,
         wheelchairPassengers,
         desiredPickupTime,
-        context
+        context,
+        passengerFareType
       );
 
       LOG.info(
@@ -107,6 +111,7 @@ public abstract class CachingDemandResponsiveTransportationService
     int regularPassengers,
     int wheelchairPassengers,
     Instant desiredPickupTime,
-    DrtRequestContext context
+    DrtRequestContext context,
+    List<PassengerFareType> passengerFareType
   );
 }

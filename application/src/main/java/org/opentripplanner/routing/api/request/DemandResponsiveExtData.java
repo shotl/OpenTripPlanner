@@ -1,6 +1,7 @@
 package org.opentripplanner.routing.api.request;
 
 import java.io.Serializable;
+import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
 
@@ -25,6 +26,28 @@ public class DemandResponsiveExtData implements Serializable {
   @Nullable
   private final Passengers passengers;
 
+  @Nullable
+  private final List<PassengerFareType> passengerFareType;
+
+  public DemandResponsiveExtData(
+    @Nullable String paxAppId,
+    @Nullable String userId,
+    @Nullable String areaId,
+    @Nullable String rideType,
+    @Nullable Passengers passengers,
+    @Nullable List<PassengerFareType> passengerFareType
+  ) {
+    this.paxAppId = paxAppId;
+    this.userId = userId;
+    this.areaId = areaId;
+    this.rideType = rideType;
+    this.passengers = passengers;
+    this.passengerFareType = passengerFareType;
+  }
+
+  /**
+   * Backwards-compatible constructor without passengerFareType.
+   */
   public DemandResponsiveExtData(
     @Nullable String paxAppId,
     @Nullable String userId,
@@ -32,11 +55,7 @@ public class DemandResponsiveExtData implements Serializable {
     @Nullable String rideType,
     @Nullable Passengers passengers
   ) {
-    this.paxAppId = paxAppId;
-    this.userId = userId;
-    this.areaId = areaId;
-    this.rideType = rideType;
-    this.passengers = passengers;
+    this(paxAppId, userId, areaId, rideType, passengers, null);
   }
 
   /**
@@ -79,6 +98,15 @@ public class DemandResponsiveExtData implements Serializable {
     return passengers;
   }
 
+  /**
+   * Optional passenger fare types for pricing calculation.
+   * May be null or empty when not provided.
+   */
+  @Nullable
+  public List<PassengerFareType> passengerFareType() {
+    return passengerFareType;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -89,13 +117,14 @@ public class DemandResponsiveExtData implements Serializable {
       Objects.equals(userId, that.userId) &&
       Objects.equals(areaId, that.areaId) &&
       Objects.equals(rideType, that.rideType) &&
-      Objects.equals(passengers, that.passengers)
+      Objects.equals(passengers, that.passengers) &&
+      Objects.equals(passengerFareType, that.passengerFareType)
     );
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(paxAppId, userId, areaId, rideType, passengers);
+    return Objects.hash(paxAppId, userId, areaId, rideType, passengers, passengerFareType);
   }
 
   @Override
@@ -116,6 +145,8 @@ public class DemandResponsiveExtData implements Serializable {
       '\'' +
       ", passengers=" +
       passengers +
+      ", passengerFareType=" +
+      passengerFareType +
       '}'
     );
   }
@@ -130,6 +161,7 @@ public class DemandResponsiveExtData implements Serializable {
     private String areaId;
     private String rideType;
     private Passengers passengers;
+    private List<PassengerFareType> passengerFareType;
 
     public Builder paxAppId(String paxAppId) {
       this.paxAppId = paxAppId;
@@ -156,8 +188,20 @@ public class DemandResponsiveExtData implements Serializable {
       return this;
     }
 
+    public Builder passengerFareType(List<PassengerFareType> passengerFareType) {
+      this.passengerFareType = passengerFareType;
+      return this;
+    }
+
     public DemandResponsiveExtData build() {
-      return new DemandResponsiveExtData(paxAppId, userId, areaId, rideType, passengers);
+      return new DemandResponsiveExtData(
+        paxAppId,
+        userId,
+        areaId,
+        rideType,
+        passengers,
+        passengerFareType
+      );
     }
   }
 

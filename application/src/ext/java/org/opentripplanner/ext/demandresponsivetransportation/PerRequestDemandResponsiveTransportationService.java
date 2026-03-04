@@ -1,10 +1,12 @@
 package org.opentripplanner.ext.demandresponsivetransportation;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
+import org.opentripplanner.routing.api.request.PassengerFareType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +54,8 @@ public class PerRequestDemandResponsiveTransportationService
     int regularPassengers,
     int wheelchairPassengers,
     Instant desiredPickupTime,
-    DrtRequestContext context
+    DrtRequestContext context,
+    List<PassengerFareType> passengerFareType
   ) {
     var cacheKey = DrtEstimateRequest.create(
       userId,
@@ -90,7 +93,8 @@ public class PerRequestDemandResponsiveTransportationService
       regularPassengers,
       wheelchairPassengers,
       desiredPickupTime,
-      context
+      context,
+      passengerFareType
     );
     cache.put(cacheKey, Optional.ofNullable(response));
     return response;

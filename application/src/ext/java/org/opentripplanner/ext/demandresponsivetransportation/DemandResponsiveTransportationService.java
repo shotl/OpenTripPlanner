@@ -1,8 +1,10 @@
 package org.opentripplanner.ext.demandresponsivetransportation;
 
 import java.time.Instant;
+import java.util.List;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
+import org.opentripplanner.routing.api.request.PassengerFareType;
 
 /**
  * A service for querying ride hailing information to be used during routing.
@@ -21,6 +23,7 @@ public interface DemandResponsiveTransportationService {
    * @param wheelchairPassengers number of wheelchair passengers
    * @param desiredPickupTime requested pickup time
    * @param context identifies the caller (shifting vs decorating) for logging
+   * @param passengerFareType optional passenger fare types for pricing calculation
    */
   ShotlArrivalEstimateResponse arrivalTimes(
     String paxAppId,
@@ -32,6 +35,7 @@ public interface DemandResponsiveTransportationService {
     int regularPassengers,
     int wheelchairPassengers,
     Instant desiredPickupTime,
-    DrtRequestContext context
+    DrtRequestContext context,
+    List<PassengerFareType> passengerFareType
   );
 }
