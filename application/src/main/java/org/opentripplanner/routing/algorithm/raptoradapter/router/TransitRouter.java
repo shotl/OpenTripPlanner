@@ -510,6 +510,13 @@ public class TransitRouter {
     if (drtEligibleStops.isEmpty()) {
       return nearbyStops;
     }
-    return nearbyStops.stream().filter(ns -> drtEligibleStops.contains(ns.stop)).toList();
+    var filtered = nearbyStops.stream().filter(ns -> drtEligibleStops.contains(ns.stop)).toList();
+    LOG.info(
+      "[DRT] Access phase: {}/{} nearby stops matched drt_stops.txt: {}",
+      filtered.size(),
+      nearbyStops.size(),
+      filtered.stream().map(ns -> ns.stop.getId().toString()).toList()
+    );
+    return filtered;
   }
 }
