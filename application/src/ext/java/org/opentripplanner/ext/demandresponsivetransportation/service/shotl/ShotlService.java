@@ -229,7 +229,8 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
         data.passengers().regular(),
         data.passengers().wheelchair()
       ),
-      data.vehicleId()
+      data.vehicleId(),
+      data.shotlDurationSeconds()
     );
   }
 

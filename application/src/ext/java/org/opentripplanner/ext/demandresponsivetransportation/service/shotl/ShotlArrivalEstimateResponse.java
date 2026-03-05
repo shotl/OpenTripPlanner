@@ -16,7 +16,8 @@ public record ShotlArrivalEstimateResponse(
   Long user_expected_dropoff_time,
   Long petition_time,
   ShotlPassengers passengers,
-  String vehicle_id
+  String vehicle_id,
+  Long shotl_duration_seconds
 ) {
   public record ShotlGeoLocation(double latitude, double longitude) {}
   public record ShotlScheduledGeoLocation(ShotlGeoLocation location, String name) {}

@@ -206,7 +206,15 @@ public class DemandResponsiveTransportationAccessShifter {
       pickupDelay = Duration.ZERO;
     }
 
-    Duration drtTravelDuration = Duration.between(userExpectedPickupTime, userExpectedDropoffTime);
+    Duration drtTravelDuration;
+    if (
+      drtEstimationResponse.shotl_duration_seconds() != null &&
+      drtEstimationResponse.shotl_duration_seconds() > 0
+    ) {
+      drtTravelDuration = Duration.ofSeconds(drtEstimationResponse.shotl_duration_seconds());
+    } else {
+      drtTravelDuration = Duration.between(userExpectedPickupTime, userExpectedDropoffTime);
+    }
     if (drtTravelDuration.isNegative() || drtTravelDuration.isZero()) {
       LOG.warn(
         "DRT travel duration is non-positive ({}) from ({},{}) to ({},{})",
@@ -220,7 +228,7 @@ public class DemandResponsiveTransportationAccessShifter {
     }
 
     LOG.info(
-      "DRT time shift: from=({},{}) to=({},{}) | requested={} | expectedPickup={} | expectedDropoff={} | pickupDelay={} | drtDuration={}",
+      "DRT time shift: from=({},{}) to=({},{}) | requested={} | expectedPickup={} | expectedDropoff={} | pickupDelay={} | drtDuration={} | shotlDurationSeconds={}",
       fromCoordinate.latitude(),
       fromCoordinate.longitude(),
       toCoordinate.latitude(),
@@ -229,7 +237,8 @@ public class DemandResponsiveTransportationAccessShifter {
       userExpectedPickupTime,
       userExpectedDropoffTime,
       pickupDelay,
-      drtTravelDuration
+      drtTravelDuration,
+      drtEstimationResponse.shotl_duration_seconds()
     );
 
     return Result.success(new DrtShiftResult(pickupDelay, drtTravelDuration));

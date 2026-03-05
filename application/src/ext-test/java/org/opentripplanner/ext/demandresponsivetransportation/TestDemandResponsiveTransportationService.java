@@ -66,7 +66,8 @@ public class TestDemandResponsiveTransportationService
       userExpectedDropoffTime,
       Instant.now().getEpochSecond(),
       new ShotlArrivalEstimateResponse.ShotlPassengers(regularPassengers, wheelchairPassengers),
-      "vehicle-456"
+      "vehicle-456",
+      null // shotl_duration_seconds not set in test mock
     );
   }
 }
