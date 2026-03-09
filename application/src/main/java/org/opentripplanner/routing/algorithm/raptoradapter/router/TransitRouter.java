@@ -310,7 +310,7 @@ public class TransitRouter {
     // Filter DRT-mode access/egress to only DRT-eligible stops (loaded from drt_stops.txt).
     // Walk-accessible stops are added separately below and are NOT filtered.
     if (mode == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION) {
-      nearbyStops = filterDrtEligibleStops(nearbyStops);
+      nearbyStops = filterDrtEligibleStops(nearbyStops, type);
     }
 
     var accessEgresses = AccessEgressMapper.mapNearbyStops(nearbyStops, type);
@@ -505,17 +505,43 @@ public class TransitRouter {
    * Filter nearby stops to only include DRT-eligible stops. If no DRT-eligible stops
    * are configured (empty set), all stops are returned unfiltered.
    */
-  private Collection<NearbyStop> filterDrtEligibleStops(Collection<NearbyStop> nearbyStops) {
+  private Collection<NearbyStop> filterDrtEligibleStops(
+    Collection<NearbyStop> nearbyStops,
+    AccessEgressType type
+  ) {
     var drtEligibleStops = serverContext.transitService().getDrtEligibleStops();
     if (drtEligibleStops.isEmpty()) {
       return nearbyStops;
     }
+
+    var nearbyStopSet = nearbyStops
+      .stream()
+      .map(ns -> ns.stop)
+      .collect(java.util.stream.Collectors.toSet());
+
     var filtered = nearbyStops.stream().filter(ns -> drtEligibleStops.contains(ns.stop)).toList();
+
+    var nearbyButNotEligible = nearbyStops
+      .stream()
+      .filter(ns -> !drtEligibleStops.contains(ns.stop))
+      .map(ns -> ns.stop.getId().toString())
+      .toList();
+
+    var eligibleButNotNearby = drtEligibleStops
+      .stream()
+      .filter(s -> !nearbyStopSet.contains(s))
+      .map(s -> s.getId().toString())
+      .sorted()
+      .toList();
+
     LOG.info(
-      "[DRT] Access phase: {}/{} nearby stops matched drt_stops.txt: {}",
+      "[DRT] {} phase: {}/{} nearby stops matched drt_stops.txt: {} | nearby but not in drt_stops.txt: {} | in drt_stops.txt but not found by street search: {}",
+      type,
       filtered.size(),
       nearbyStops.size(),
-      filtered.stream().map(ns -> ns.stop.getId().toString()).toList()
+      filtered.stream().map(ns -> ns.stop.getId().toString()).toList(),
+      nearbyButNotEligible.size(),
+      eligibleButNotNearby
     );
     return filtered;
   }

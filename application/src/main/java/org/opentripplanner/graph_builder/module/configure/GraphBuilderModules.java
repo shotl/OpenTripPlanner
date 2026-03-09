@@ -131,9 +131,14 @@ public class GraphBuilderModules {
   @Singleton
   static DrtStopsModule provideDrtStopsModule(
     GraphBuilderDataSources dataSources,
-    TimetableRepository timetableRepository
+    TimetableRepository timetableRepository,
+    Graph graph
   ) {
-    return new DrtStopsModule(dataSources.getGtfsConfiguredDatasource(), timetableRepository);
+    return new DrtStopsModule(
+      dataSources.getGtfsConfiguredDatasource(),
+      timetableRepository,
+      graph
+    );
   }
 
   @Provides

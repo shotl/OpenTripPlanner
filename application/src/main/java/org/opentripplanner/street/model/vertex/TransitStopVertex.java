@@ -104,10 +104,33 @@ public class TransitStopVertex extends StationElementVertex {
    * Determines if this vertex is linked (via a {@link StreetTransitEntityLink}) to a drivable edge
    * in the street network.
    * <p>
+   * Checks outgoing links (stop → street), meaning a car can depart from this stop.
+   * Useful for egress validation.
+   * <p>
    * This method is slow: only use this during graph build.
    */
   public boolean isLinkedToDrivableEdge() {
     return isLinkedToEdgeWhichAllows(CAR);
+  }
+
+  /**
+   * Determines if this stop is reachable by car for access routing (i.e. a car can arrive here).
+   * <p>
+   * Checks incoming links (street → stop), meaning the forward Dijkstra from an origin can
+   * reach this stop via car-traversable edges. A stop that only has outgoing car links but no
+   * incoming car links sits on a one-way street going away from the stop and will never be found
+   * by an access search.
+   * <p>
+   * This method is slow: only use this during graph build.
+   */
+  public boolean isReachableByCarForAccess() {
+    return getIncoming()
+      .stream()
+      .anyMatch(
+        edge ->
+          edge instanceof StreetTransitEntityLink<?> link &&
+          link.getFromVertex().getIncomingStreetEdges().stream().anyMatch(se -> se.canTraverse(CAR))
+      );
   }
 
   /**

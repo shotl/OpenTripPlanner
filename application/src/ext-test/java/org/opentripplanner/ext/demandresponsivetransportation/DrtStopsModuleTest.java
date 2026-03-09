@@ -14,6 +14,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.opentripplanner.graph_builder.ConfiguredDataSource;
 import org.opentripplanner.gtfs.graphbuilder.GtfsFeedParameters;
 import org.opentripplanner.gtfs.graphbuilder.GtfsFeedParametersBuilder;
+import org.opentripplanner.routing.graph.Graph;
 import org.opentripplanner.transit.model._data.TimetableRepositoryForTest;
 import org.opentripplanner.transit.model.framework.Deduplicator;
 import org.opentripplanner.transit.model.site.RegularStop;
@@ -46,7 +47,7 @@ class DrtStopsModuleTest {
     var dataSource = createConfiguredDataSource(tempDir);
 
     // Run the module
-    var module = new DrtStopsModule(List.of(dataSource), timetableRepository);
+    var module = new DrtStopsModule(List.of(dataSource), timetableRepository, new Graph());
     module.buildGraph();
 
     // Verify
@@ -74,7 +75,7 @@ class DrtStopsModuleTest {
 
     var dataSource = createConfiguredDataSource(tempDir);
 
-    var module = new DrtStopsModule(List.of(dataSource), timetableRepository);
+    var module = new DrtStopsModule(List.of(dataSource), timetableRepository, new Graph());
     module.buildGraph();
 
     assertTrue(timetableRepository.getDrtEligibleStops().isEmpty());
@@ -96,7 +97,7 @@ class DrtStopsModuleTest {
 
     var dataSource = createConfiguredDataSource(tempDir);
 
-    var module = new DrtStopsModule(List.of(dataSource), timetableRepository);
+    var module = new DrtStopsModule(List.of(dataSource), timetableRepository, new Graph());
     module.buildGraph();
 
     var eligibleStops = timetableRepository.getDrtEligibleStops();

@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.ws.rs.core.UriBuilder;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import org.opentripplanner.ext.demandresponsivetransportation.CachingDemandResponsiveTransportationService;
@@ -28,6 +30,9 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
   private static final Logger LOG = LoggerFactory.getLogger(ShotlService.class);
   private static final String DEFAULT_TIME_ESTIMATE_PATH = "v3/drt/time-estimations";
   private static final ObjectMapper MAPPER = ObjectMappers.ignoringExtraFields();
+  private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern(
+    "yyyy-MM-dd'T'HH:mm:ss'Z'"
+  ).withZone(ZoneId.of("UTC"));
 
   /**
    * HTTP request timeout for Shotl API calls. Kept short to avoid blocking connection pool
@@ -176,13 +181,25 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
 
     var data = apiResponse.data();
     LOG.info(
-      "[DRT] API SUCCESS | context={} | areaId={} | id={} | userExpectedPickupTime={} | " +
-      "userExpectedDropoffTime={} | status={} | vehicleId={}",
+      "[DRT] API SUCCESS | context={} | areaId={} | id={} | desiredPickupLocation=({},{}) | " +
+      "desiredDropoffLocation=({},{}) | scheduledPickupPlace={} | scheduledDropoffPlace={} | " +
+      "desiredPickupTime={} | desiredDropoffTime={} | userExpectedPickupTime={} | " +
+      "userExpectedDropoffTime={} | doorToDoorDurationSeconds={} | shotlDurationSeconds={} | status={} | vehicleId={}",
       context,
       areaId,
       data.id(),
-      data.userExpectedPickupTime(),
-      data.userExpectedDropoffTime(),
+      data.desiredPickupLocation().latitude(),
+      data.desiredPickupLocation().longitude(),
+      data.desiredDropoffLocation().latitude(),
+      data.desiredDropoffLocation().longitude(),
+      data.scheduledPickupPlace(),
+      data.scheduledDropoffPlace(),
+      formatTimestamp(data.desiredPickupTime()),
+      formatTimestamp(data.desiredDropoffTime()),
+      formatTimestamp(data.userExpectedPickupTime()),
+      formatTimestamp(data.userExpectedDropoffTime()),
+      data.doorToDoorDurationSeconds(),
+      data.shotlDurationSeconds(),
       data.status(),
       data.vehicleId()
     );
@@ -247,5 +264,12 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
       ),
       place.name()
     );
+  }
+
+  private String formatTimestamp(Long epochSeconds) {
+    if (epochSeconds == null) {
+      return "null";
+    }
+    return TIMESTAMP_FORMATTER.format(Instant.ofEpochSecond(epochSeconds));
   }
 }

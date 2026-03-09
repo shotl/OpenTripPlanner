@@ -7,6 +7,7 @@ import java.util.Set;
 import org.opentripplanner.graph_builder.ConfiguredDataSource;
 import org.opentripplanner.graph_builder.model.GraphBuilderModule;
 import org.opentripplanner.gtfs.graphbuilder.GtfsFeedParameters;
+import org.opentripplanner.routing.graph.Graph;
 import org.opentripplanner.transit.model.site.StopLocation;
 import org.opentripplanner.transit.service.TimetableRepository;
 import org.slf4j.Logger;
@@ -24,14 +25,17 @@ public class DrtStopsModule implements GraphBuilderModule {
 
   private final Iterable<ConfiguredDataSource<GtfsFeedParameters>> dataSources;
   private final TimetableRepository timetableRepository;
+  private final Graph graph;
 
   @Inject
   public DrtStopsModule(
     Iterable<ConfiguredDataSource<GtfsFeedParameters>> dataSources,
-    TimetableRepository timetableRepository
+    TimetableRepository timetableRepository,
+    Graph graph
   ) {
     this.dataSources = dataSources;
     this.timetableRepository = timetableRepository;
+    this.graph = graph;
   }
 
   @Override
@@ -58,11 +62,38 @@ public class DrtStopsModule implements GraphBuilderModule {
     Set<StopLocation> drtEligibleStops = resolveStopIds(allDrtStopIds);
     timetableRepository.setDrtEligibleStops(drtEligibleStops);
     LOG.info(
-      "Loaded {} DRT-eligible stops (resolved {} of {} IDs).",
+      "Loaded {} DRT-eligible stops (resolved {} of {} raw IDs from drt_stops.txt): {}",
       drtEligibleStops.size(),
       drtEligibleStops.size(),
-      allDrtStopIds.size()
+      allDrtStopIds.size(),
+      drtEligibleStops.stream().map(s -> s.getId().toString()).sorted().toList()
     );
+
+    validateDrivableStreetLinks(drtEligibleStops);
+  }
+
+  /**
+   * Warn at build time for any DRT-eligible stop that is not linked to a car-traversable
+   * street edge. Such stops will never be reached by the DRT car access search at query time.
+   */
+  private void validateDrivableStreetLinks(Set<StopLocation> drtEligibleStops) {
+    var streetIndex = graph.getStreetIndexSafe(timetableRepository.getSiteRepository());
+    for (StopLocation stop : drtEligibleStops) {
+      var vertex = streetIndex.findTransitStopVertices(stop.getId());
+      if (vertex == null) {
+        LOG.warn(
+          "[DRT] Stop {} ({}) has no street vertex — it will never be found by the DRT access search.",
+          stop.getId(),
+          stop.getName()
+        );
+      } else if (!vertex.isReachableByCarForAccess()) {
+        LOG.warn(
+          "[DRT] Stop {} ({}) is not reachable by car for access — no incoming car-traversable street link found. It may be on a one-way street or in a pedestrian-only area. Check its coordinates in stops.txt.",
+          stop.getId(),
+          stop.getName()
+        );
+      }
+    }
   }
 
   private Set<StopLocation> resolveStopIds(Set<String> stopIds) {
