@@ -37,6 +37,38 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
     this.drtDurationSeconds = other.drtDurationSeconds;
   }
 
+  /**
+   * Creates a copy of this adapter for a sibling stop that shares the same parent station
+   * as the original DRT stop. The DRT leg is identical (same pickup delay, same route to
+   * the DRT stop), but additional walk time is added for the transfer from the DRT stop
+   * to the sibling stop.
+   * <p>
+   * This avoids extra DRT API calls: the DRT estimate is computed once for the car-accessible
+   * stop, then reused for all sibling stops with only the walk time difference.
+   */
+  public DemandResponsiveTransportationAccessAdapter forSiblingStop(
+    int siblingStopIndex,
+    int additionalWalkSeconds
+  ) {
+    return new DemandResponsiveTransportationAccessAdapter(
+      siblingStopIndex,
+      this.arrival,
+      this.drtDurationSeconds + additionalWalkSeconds,
+      this.getLastState()
+    );
+  }
+
+  private DemandResponsiveTransportationAccessAdapter(
+    int stopIndex,
+    Duration arrival,
+    int drtDurationSeconds,
+    org.opentripplanner.street.search.state.State lastState
+  ) {
+    super(stopIndex, lastState);
+    this.arrival = arrival;
+    this.drtDurationSeconds = drtDurationSeconds;
+  }
+
   @Override
   public int durationInSeconds() {
     return drtDurationSeconds;

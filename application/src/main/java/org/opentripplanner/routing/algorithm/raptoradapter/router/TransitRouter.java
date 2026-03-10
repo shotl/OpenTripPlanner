@@ -13,9 +13,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.stream.IntStream;
 import javax.annotation.Nullable;
+import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationAccessAdapter;
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationAccessShifter;
 import org.opentripplanner.ext.ridehailing.RideHailingAccessShifter;
 import org.opentripplanner.framework.application.OTPFeature;
+import org.opentripplanner.framework.model.TimeAndCost;
+import org.opentripplanner.model.PathTransfer;
 import org.opentripplanner.model.plan.Itinerary;
 import org.opentripplanner.raptor.RaptorService;
 import org.opentripplanner.raptor.api.path.RaptorPath;
@@ -27,6 +30,7 @@ import org.opentripplanner.routing.algorithm.raptoradapter.router.street.AccessE
 import org.opentripplanner.routing.algorithm.raptoradapter.router.street.AccessEgressType;
 import org.opentripplanner.routing.algorithm.raptoradapter.router.street.AccessEgresses;
 import org.opentripplanner.routing.algorithm.raptoradapter.router.street.FlexAccessEgressRouter;
+import org.opentripplanner.routing.algorithm.raptoradapter.transit.DefaultAccessEgress;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.RaptorTransitData;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.RoutingAccessEgress;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.TripSchedule;
@@ -328,6 +332,13 @@ public class TransitRouter {
 
     // LOG.info("[DRT-DEBUG] accessEgresses after timeshifting: count={}", accessEgresses.size());
 
+    // Expand DRT access/egress to sibling stops sharing the same parent station.
+    // This avoids extra DRT API calls: the DRT estimate is computed once for the
+    // car-accessible stop, then reused for all sibling stops with added walk time.
+    if (mode == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION) {
+      accessEgresses = expandDrtToSiblingStops(accessEgresses, nearbyStops);
+    }
+
     var results = new ArrayList<>(accessEgresses);
 
     // When mode is DRT, also find walk-accessible stops so that walk+transit
@@ -544,5 +555,113 @@ public class TransitRouter {
       eligibleButNotNearby
     );
     return filtered;
+  }
+
+  /**
+   * Expand DRT access/egress entries to sibling stops that share the same parent station.
+   * <p>
+   * When a DRT-eligible stop (e.g. Porta Nuova C1) belongs to a parent station, this method
+   * creates synthetic access/egress entries for all sibling stops in that station (e.g. A1, A2,
+   * B1, etc.) by adding the walk transfer time between the DRT stop and each sibling.
+   * <p>
+   * Works for both access and egress:
+   * <ul>
+   *   <li>Access (timeshifted): DRT drops at C1 → walk to sibling → board bus at sibling</li>
+   *   <li>Egress (not timeshifted): alight at sibling → walk to C1 → DRT picks up at C1</li>
+   * </ul>
+   * <p>
+   * This avoids extra DRT API calls: the DRT estimate is computed once for the car-accessible
+   * stop, then reused for all sibling stops with only the walk time added.
+   */
+  private List<RoutingAccessEgress> expandDrtToSiblingStops(
+    List<RoutingAccessEgress> drtResults,
+    Collection<NearbyStop> drtNearbyStops
+  ) {
+    var expanded = new ArrayList<>(drtResults);
+    var transitService = serverContext.transitService();
+    double walkSpeed = request.preferences().walk().speed();
+
+    for (var drtResult : drtResults) {
+      // Skip entries without car mode (e.g. pure walk entries)
+      if (!drtResult.getLastState().containsModeCar()) {
+        continue;
+      }
+
+      // Find the original NearbyStop to get the StopLocation (we only have stop index here)
+      StopLocation drtStop = null;
+      for (var ns : drtNearbyStops) {
+        if (ns.stop.getIndex() == drtResult.stop()) {
+          drtStop = ns.stop;
+          break;
+        }
+      }
+      if (drtStop == null) {
+        continue;
+      }
+
+      var parentStation = drtStop.getParentStation();
+      if (parentStation == null) {
+        continue;
+      }
+
+      // Build a map of sibling stops reachable via walk transfer from the DRT stop.
+      // Walk distances are symmetric, so these transfers work for both directions:
+      // access (DRT stop → sibling) and egress (sibling → DRT stop).
+      var walkTransfers = transitService.findPathTransfers(drtStop);
+      var siblingTransferMap = new java.util.HashMap<StopLocation, PathTransfer>();
+      for (var pt : walkTransfers) {
+        if (pt.getModes().contains(StreetMode.WALK)) {
+          siblingTransferMap.putIfAbsent(pt.to, pt);
+        }
+      }
+
+      int siblingCount = 0;
+      for (var sibling : parentStation.getChildStops()) {
+        if (sibling.getIndex() == drtStop.getIndex()) {
+          continue;
+        }
+
+        PathTransfer transfer = siblingTransferMap.get(sibling);
+        if (transfer == null) {
+          LOG.debug(
+            "[DRT] No walk transfer from DRT stop {} to sibling {} in station {}",
+            drtStop.getId(),
+            sibling.getId(),
+            parentStation.getId()
+          );
+          continue;
+        }
+
+        int walkTimeSeconds = (int) Math.ceil(transfer.getDistanceMeters() / walkSpeed);
+
+        if (drtResult instanceof DemandResponsiveTransportationAccessAdapter drtAdapter) {
+          // Access: timeshifted DRT entry — reuse pickup delay and DRT duration + walk
+          expanded.add(drtAdapter.forSiblingStop(sibling.getIndex(), walkTimeSeconds));
+        } else {
+          // Egress: plain DefaultAccessEgress with car mode — add walk time to duration
+          expanded.add(
+            new DefaultAccessEgress(
+              sibling.getIndex(),
+              drtResult.durationInSeconds() + walkTimeSeconds,
+              drtResult.c1(),
+              TimeAndCost.ZERO,
+              drtResult.getLastState()
+            )
+          );
+        }
+        siblingCount++;
+      }
+
+      if (siblingCount > 0) {
+        LOG.info(
+          "[DRT] Expanded DRT stop {} to {} sibling stops in station {}",
+          drtStop.getId(),
+          siblingCount,
+          parentStation.getId()
+        );
+      }
+    }
+
+    return expanded;
   }
 }
