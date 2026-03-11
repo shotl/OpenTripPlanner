@@ -105,10 +105,8 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
       null // desiredDropoffTime not provided in current interface
     );
 
-    // Set pickup_shift for egress decoration requests
-    if (pickupShift) {
-      request.setPickupShift(true);
-    }
+    // Always send pickup_shift=true for access/egress and leg decoration requests
+    request.setPickupShift(true);
 
     // Set optional passenger fare types for pricing calculation
     if (passengerFareType != null && !passengerFareType.isEmpty()) {

@@ -127,7 +127,7 @@ public class DecorateWithDRT implements ItineraryListFilter {
         pickupTime,
         DrtRequestContext.LEG_DECORATING,
         request.demandResponsiveExtData().passengerFareType(),
-        isEgress
+        true
       );
       if (drtEstimationResponse == null) {
         LOG.warn(
