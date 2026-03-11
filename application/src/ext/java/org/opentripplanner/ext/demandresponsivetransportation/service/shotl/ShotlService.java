@@ -73,7 +73,8 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
     int wheelchairPassengers,
     Instant desiredPickupTime,
     DrtRequestContext context,
-    List<PassengerFareType> passengerFareType
+    List<PassengerFareType> passengerFareType,
+    boolean pickupShift
   ) {
     var uri = UriBuilder.fromUri(timeEstimateUri).build();
 
@@ -103,6 +104,11 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
       desiredPickupTime != null ? desiredPickupTime.getEpochSecond() : null,
       null // desiredDropoffTime not provided in current interface
     );
+
+    // Set pickup_shift for egress decoration requests
+    if (pickupShift) {
+      request.setPickupShift(true);
+    }
 
     // Set optional passenger fare types for pricing calculation
     if (passengerFareType != null && !passengerFareType.isEmpty()) {

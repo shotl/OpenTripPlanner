@@ -37,6 +37,9 @@ public class ShotlTimeEstimateRequest {
   @JsonProperty("passenger_fare_type")
   private List<PassengerFareTypeInput> passengerFareType;
 
+  @JsonProperty("pickup_shift")
+  private Boolean pickupShift;
+
   public ShotlTimeEstimateRequest() {}
 
   public ShotlTimeEstimateRequest(
@@ -130,6 +133,14 @@ public class ShotlTimeEstimateRequest {
 
   public void setPassengerFareType(List<PassengerFareTypeInput> passengerFareType) {
     this.passengerFareType = passengerFareType;
+  }
+
+  public Boolean getPickupShift() {
+    return pickupShift;
+  }
+
+  public void setPickupShift(Boolean pickupShift) {
+    this.pickupShift = pickupShift;
   }
 
   /**

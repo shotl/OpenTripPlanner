@@ -24,6 +24,7 @@ public interface DemandResponsiveTransportationService {
    * @param desiredPickupTime requested pickup time
    * @param context identifies the caller (shifting vs decorating) for logging
    * @param passengerFareType optional passenger fare types for pricing calculation
+   * @param pickupShift whether this is a pickup shift request (true for egress decoration)
    */
   ShotlArrivalEstimateResponse arrivalTimes(
     String paxAppId,
@@ -36,6 +37,7 @@ public interface DemandResponsiveTransportationService {
     int wheelchairPassengers,
     Instant desiredPickupTime,
     DrtRequestContext context,
-    List<PassengerFareType> passengerFareType
+    List<PassengerFareType> passengerFareType,
+    boolean pickupShift
   );
 }

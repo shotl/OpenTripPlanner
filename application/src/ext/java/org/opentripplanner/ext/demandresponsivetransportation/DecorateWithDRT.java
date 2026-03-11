@@ -126,7 +126,8 @@ public class DecorateWithDRT implements ItineraryListFilter {
         request.demandResponsiveExtData().passengers().wheelchair(),
         pickupTime,
         DrtRequestContext.LEG_DECORATING,
-        request.demandResponsiveExtData().passengerFareType()
+        request.demandResponsiveExtData().passengerFareType(),
+        isEgress
       );
       if (drtEstimationResponse == null) {
         LOG.warn(

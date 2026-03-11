@@ -38,7 +38,8 @@ public class TestDemandResponsiveTransportationService
     int wheelchairPassengers,
     Instant desiredPickupTime,
     DrtRequestContext context,
-    List<PassengerFareType> passengerFareType
+    List<PassengerFareType> passengerFareType,
+    boolean pickupShift
   ) {
     // Calculate expected pickup time by adding arrival delay to desired pickup time
     long userExpectedPickupTime = desiredPickupTime.plus(arrivalDelay).getEpochSecond();

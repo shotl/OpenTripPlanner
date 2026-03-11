@@ -36,7 +36,8 @@ public abstract class CachingDemandResponsiveTransportationService
     int wheelchairPassengers,
     Instant desiredPickupTime,
     DrtRequestContext context,
-    List<PassengerFareType> passengerFareType
+    List<PassengerFareType> passengerFareType,
+    boolean pickupShift
   ) {
     LOG.info(
       "[DRT] API CALL | context={} | areaId={} | from=({},{}) | to=({},{}) | pickupTime={} | " +
@@ -62,7 +63,8 @@ public abstract class CachingDemandResponsiveTransportationService
         wheelchairPassengers,
         desiredPickupTime,
         context,
-        passengerFareType
+        passengerFareType,
+        pickupShift
       );
 
       LOG.info(
@@ -112,6 +114,7 @@ public abstract class CachingDemandResponsiveTransportationService
     int wheelchairPassengers,
     Instant desiredPickupTime,
     DrtRequestContext context,
-    List<PassengerFareType> passengerFareType
+    List<PassengerFareType> passengerFareType,
+    boolean pickupShift
   );
 }

@@ -177,7 +177,8 @@ public class DemandResponsiveTransportationAccessShifter {
       req.demandResponsiveExtData().passengers().wheelchair(),
       desiredPickupTime,
       isAccess ? DrtRequestContext.ACCESS_SHIFTING : DrtRequestContext.EGRESS_SHIFTING,
-      req.demandResponsiveExtData().passengerFareType()
+      req.demandResponsiveExtData().passengerFareType(),
+      false
     );
     if (drtEstimationResponse == null) {
       return Result.failure(Error.NO_ARRIVAL_FOR_LOCATION);
