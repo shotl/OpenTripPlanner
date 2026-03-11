@@ -8,17 +8,17 @@ app:
   image:
     tag: "{{ .App.imageTag }}"
 
-  command: ["--max-memory", "4", "--config-files-path", "/app/config", "serve"]
+  command: ["--max-memory", "12", "serve"]
 
   replicas: 1
 
   # Other pods in the same node might suffer when otp-server is starting
   resources:
     limits:
-      memory: 4096Mi
+      memory: 14Gi
     requests:
-      cpu: 250m
-      memory: 2048Mi
+      cpu: 1000m
+      memory: 12Gi
 
   monitoring:
     prometheus:
@@ -29,15 +29,23 @@ app:
       serviceMonitor:
         enabled: true
 
-  startupProbe:
-    enabled: true
-    path: /otp/actuators/health
-
   readinessProbe:
+    failureThreshold: 15
     path: /otp/actuators/health
 
   livenessProbe:
+    failureThreshold: 12
+    initialDelaySeconds: 60
     path: /otp/actuators/health
+
+  nodeSelector:
+    shotl.com/workload-type: memory-intensive
+
+  tolerations:
+    - key: shotl.com/workload-type
+      operator: Equal
+      value: memory-intensive
+      effect: NoSchedule
 
   serviceAccount:
     annotations:

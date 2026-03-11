@@ -1,9 +1,9 @@
 app:
-  nodeSelector:
-    shotl.com/workload-type: memory-intensive
+  command: ["--max-memory", "4", "--config-files-path", "/app/config", "serve"]
 
-  tolerations:
-    - key: shotl.com/workload-type
-      operator: Equal
-      value: memory-intensive
-      effect: NoSchedule
+  resources:
+    limits:
+      memory: 4096Mi
+    requests:
+      cpu: 250m
+      memory: 2048Mi
