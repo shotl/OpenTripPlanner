@@ -121,11 +121,11 @@ class DemandResponsiveTransportationAccessShifterTest {
       "Shifted start time should include DRT pickup delay"
     );
 
-    // Verify the duration is the DRT travel duration (30 min), not the car-based duration
+    // Verify the duration includes walk + DRT + walk: 120s + 1800s + 60s = 1980s
     assertEquals(
-      1800,
+      1980,
       shiftedAccess.durationInSeconds(),
-      "Access duration should be the DRT travel duration (30 min), not car driving time"
+      "Access duration should include walk to pickup (120s) + DRT travel (1800s) + walk from dropoff (60s)"
     );
   }
 

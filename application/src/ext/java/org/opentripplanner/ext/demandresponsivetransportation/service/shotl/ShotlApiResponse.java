@@ -42,7 +42,9 @@ public record ShotlApiResponse(
     @JsonProperty("effective_pickup_time") Long effectivePickupTime,
     @JsonProperty("effective_dropoff_time") Long effectiveDropoffTime,
     @JsonProperty("door_to_door_duration_seconds") Long doorToDoorDurationSeconds,
-    @JsonProperty("shotl_duration_seconds") Long shotlDurationSeconds
+    @JsonProperty("shotl_duration_seconds") Long shotlDurationSeconds,
+    @JsonProperty("pickup_walking_seconds") Long pickupWalkingSeconds,
+    @JsonProperty("dropoff_walking_seconds") Long dropoffWalkingSeconds
   ) {}
 
   /**

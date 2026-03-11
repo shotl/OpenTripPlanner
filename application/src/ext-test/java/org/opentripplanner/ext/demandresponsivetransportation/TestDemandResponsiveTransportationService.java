@@ -68,7 +68,9 @@ public class TestDemandResponsiveTransportationService
       Instant.now().getEpochSecond(),
       new ShotlArrivalEstimateResponse.ShotlPassengers(regularPassengers, wheelchairPassengers),
       "vehicle-456",
-      null // shotl_duration_seconds not set in test mock
+      null, // shotl_duration_seconds not set in test mock
+      120L, // pickup_walking_seconds (2 min walk to pickup)
+      60L // dropoff_walking_seconds (1 min walk from dropoff)
     );
   }
 }

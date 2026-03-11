@@ -79,10 +79,15 @@ public class DemandResponsiveTransportationAccessShifter {
 
     if (result.isSuccess()) {
       var shift = result.successValue();
+      var preferences = request.preferences();
       return new DemandResponsiveTransportationAccessAdapter(
         ae,
         shift.pickupDelay(),
-        shift.drtTravelDuration()
+        shift.drtTravelDuration(),
+        shift.walkToPickupSeconds(),
+        shift.walkFromDropoffSeconds(),
+        preferences.walk().reluctance(),
+        preferences.car().reluctance()
       );
     } else {
       return null;
@@ -228,8 +233,15 @@ public class DemandResponsiveTransportationAccessShifter {
       return Result.failure(Error.TECHNICAL_ERROR);
     }
 
+    long walkToPickupSeconds = drtEstimationResponse.pickup_walking_seconds() != null
+      ? drtEstimationResponse.pickup_walking_seconds()
+      : 0L;
+    long walkFromDropoffSeconds = drtEstimationResponse.dropoff_walking_seconds() != null
+      ? drtEstimationResponse.dropoff_walking_seconds()
+      : 0L;
+
     LOG.info(
-      "DRT time shift: from=({},{}) to=({},{}) | requested={} | expectedPickup={} | expectedDropoff={} | pickupDelay={} | drtDuration={} | shotlDurationSeconds={}",
+      "DRT time shift: from=({},{}) to=({},{}) | requested={} | expectedPickup={} | expectedDropoff={} | pickupDelay={} | drtDuration={} | shotlDurationSeconds={} | walkToPickup={}s | walkFromDropoff={}s",
       fromCoordinate.latitude(),
       fromCoordinate.longitude(),
       toCoordinate.latitude(),
@@ -239,10 +251,19 @@ public class DemandResponsiveTransportationAccessShifter {
       userExpectedDropoffTime,
       pickupDelay,
       drtTravelDuration,
-      drtEstimationResponse.shotl_duration_seconds()
+      drtEstimationResponse.shotl_duration_seconds(),
+      walkToPickupSeconds,
+      walkFromDropoffSeconds
     );
 
-    return Result.success(new DrtShiftResult(pickupDelay, drtTravelDuration));
+    return Result.success(
+      new DrtShiftResult(
+        pickupDelay,
+        drtTravelDuration,
+        walkToPickupSeconds,
+        walkFromDropoffSeconds
+      )
+    );
   }
 
   /**
@@ -265,11 +286,16 @@ public class DemandResponsiveTransportationAccessShifter {
         true
       );
     } else {
-      return Result.success(new DrtShiftResult(Duration.ZERO, Duration.ZERO));
+      return Result.success(new DrtShiftResult(Duration.ZERO, Duration.ZERO, 0L, 0L));
     }
   }
 
-  record DrtShiftResult(Duration pickupDelay, Duration drtTravelDuration) {}
+  record DrtShiftResult(
+    Duration pickupDelay,
+    Duration drtTravelDuration,
+    long walkToPickupSeconds,
+    long walkFromDropoffSeconds
+  ) {}
 
   enum Error {
     NO_ARRIVAL_FOR_LOCATION,
