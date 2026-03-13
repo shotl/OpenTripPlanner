@@ -720,6 +720,7 @@ public class GraphQLTypes {
   public static class GraphQLDrtInput {
 
     private String areaId;
+    private Double egressReluctance;
     private GraphQLDrtPassengersInput passengers;
     private List<GraphQLDrtPassengerFareTypeInput> passengerFareType;
     private String paxAppId;
@@ -730,6 +731,9 @@ public class GraphQLTypes {
     public GraphQLDrtInput(Map<String, Object> args) {
       if (args != null) {
         this.areaId = (String) args.get("areaId");
+        if (args.get("egressReluctance") != null) {
+          this.egressReluctance = ((Number) args.get("egressReluctance")).doubleValue();
+        }
         this.passengers = new GraphQLDrtPassengersInput(
           (Map<String, Object>) args.get("passengers")
         );
@@ -748,6 +752,10 @@ public class GraphQLTypes {
 
     public String getGraphQLAreaId() {
       return this.areaId;
+    }
+
+    public Double getGraphQLEgressReluctance() {
+      return this.egressReluctance;
     }
 
     public GraphQLDrtPassengersInput getGraphQLPassengers() {
@@ -772,6 +780,10 @@ public class GraphQLTypes {
 
     public void setGraphQLAreaId(String areaId) {
       this.areaId = areaId;
+    }
+
+    public void setGraphQLEgressReluctance(Double egressReluctance) {
+      this.egressReluctance = egressReluctance;
     }
 
     public void setGraphQLPassengers(GraphQLDrtPassengersInput passengers) {

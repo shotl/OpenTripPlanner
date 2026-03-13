@@ -169,7 +169,33 @@ class DemandResponsiveTransportationAccessShifterTest {
     assertSame(
       egress,
       result.get(0),
-      "Egress shifting is deferred to leg decoration, so the original egress should be returned"
+      "Egress shifting is deferred to leg decoration; DRT egress reluctance is applied " +
+      "during the CAR street search in TransitRouter, not here"
+    );
+  }
+
+  @Test
+  void testEgressNotShiftedEvenWithReluctance() {
+    // Even when egressReluctance > 1.0 is set, the shifter should NOT inflate costs.
+    // The reluctance is applied at the street routing level (TransitRouter), not here.
+    var drivingState = TestStateBuilder.ofDriving().streetEdge().streetEdge().build();
+    var egress = new DefaultAccessEgress(0, drivingState);
+
+    RouteRequest req = createRouteRequestWithEgressReluctance(NOW, 3.0);
+
+    var result = DemandResponsiveTransportationAccessShifter.shiftAccesses(
+      false, // egress
+      List.of(egress),
+      List.of(service),
+      req,
+      NOW
+    );
+
+    assertEquals(1, result.size(), "Egress should be returned unmodified");
+    assertSame(
+      egress,
+      result.get(0),
+      "Shifter should not inflate egress cost — that's done during street routing"
     );
   }
 
@@ -194,6 +220,16 @@ class DemandResponsiveTransportationAccessShifterTest {
   }
 
   private RouteRequest createRouteRequest(Instant searchTime) {
+    return createRouteRequestWithEgressReluctance(
+      searchTime,
+      DemandResponsiveExtData.DEFAULT_EGRESS_RELUCTANCE
+    );
+  }
+
+  private RouteRequest createRouteRequestWithEgressReluctance(
+    Instant searchTime,
+    double egressReluctance
+  ) {
     var req = new RouteRequest();
     req.setDateTime(searchTime);
     req.setFrom(FROM);
@@ -211,10 +247,49 @@ class DemandResponsiveTransportationAccessShifterTest {
         "test-user-id", // userId
         "test-area-id", // areaId
         "SHARED", // rideType
-        new Passengers(1, 0)
+        new Passengers(1, 0),
+        null, // passengerFareType
+        egressReluctance
       )
     );
 
     return req;
+  }
+
+  /**
+   * Verify that the car reluctance replacement logic (used in TransitRouter for DRT egress)
+   * correctly modifies the preferences on a cloned RouteRequest.
+   * The egressReluctance replaces (not multiplies) the car reluctance.
+   */
+  @Test
+  void testCarReluctanceInflationForEgress() {
+    RouteRequest req = createRouteRequestWithEgressReluctance(NOW, 2.5);
+    double originalCarReluctance = req.preferences().car().reluctance();
+    RouteRequest cloned = req.clone();
+
+    double egressReluctance = cloned.demandResponsiveExtData().egressReluctance();
+
+    cloned.withPreferences(p -> p.withCar(c -> c.withReluctance(egressReluctance)));
+
+    // Original request should be unchanged
+    assertEquals(
+      originalCarReluctance,
+      req.preferences().car().reluctance(),
+      "Original request car reluctance should be unmodified"
+    );
+
+    // Cloned request should have the egressReluctance as the car reluctance (replacement)
+    assertEquals(
+      2.5,
+      cloned.preferences().car().reluctance(),
+      0.001,
+      "Cloned request car reluctance should be replaced by egressReluctance"
+    );
+  }
+
+  @Test
+  void testDefaultEgressReluctanceIsOne() {
+    var data = new DemandResponsiveExtData("app", "user", "area", "SHARED", new Passengers(1, 0));
+    assertEquals(1.0, data.egressReluctance(), "Default egress reluctance should be 1.0");
   }
 }

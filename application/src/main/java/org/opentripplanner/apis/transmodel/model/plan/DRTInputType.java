@@ -39,5 +39,17 @@ public class DRTInputType {
         .description("Passenger information for the DRT ride.")
         .type(PASSENGERS_INPUT_TYPE)
     )
+    .field(f ->
+      f
+        .name("egressReluctance")
+        .description(
+          "Reluctance multiplier applied to CAR-based egress generalized cost before RAPTOR routing. " +
+          "A value of 1.0 (default) means no cost inflation. Values greater than 1.0 make DRT egress " +
+          "paths appear more expensive, compensating for the fact that real DRT travel times are " +
+          "typically longer than plain CAR routing estimates."
+        )
+        .type(Scalars.GraphQLFloat)
+        .defaultValueLiteral(graphql.language.FloatValue.of(1.0))
+    )
     .build();
 }

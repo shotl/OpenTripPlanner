@@ -11,6 +11,13 @@ import javax.annotation.Nullable;
  */
 public class DemandResponsiveExtData implements Serializable {
 
+  /**
+   * Default DRT egress reluctance (1.0 = no cost inflation).
+   * Values > 1.0 inflate the CAR-based egress generalized cost before RAPTOR,
+   * compensating for the fact that DRT is typically slower than self-driving.
+   */
+  public static final double DEFAULT_EGRESS_RELUCTANCE = 1.0;
+
   @Nullable
   private final String paxAppId;
 
@@ -29,6 +36,29 @@ public class DemandResponsiveExtData implements Serializable {
   @Nullable
   private final List<PassengerFareType> passengerFareType;
 
+  private final double egressReluctance;
+
+  public DemandResponsiveExtData(
+    @Nullable String paxAppId,
+    @Nullable String userId,
+    @Nullable String areaId,
+    @Nullable String rideType,
+    @Nullable Passengers passengers,
+    @Nullable List<PassengerFareType> passengerFareType,
+    double egressReluctance
+  ) {
+    this.paxAppId = paxAppId;
+    this.userId = userId;
+    this.areaId = areaId;
+    this.rideType = rideType;
+    this.passengers = passengers;
+    this.passengerFareType = passengerFareType;
+    this.egressReluctance = egressReluctance;
+  }
+
+  /**
+   * Backwards-compatible constructor without egressReluctance (defaults to 1.0).
+   */
   public DemandResponsiveExtData(
     @Nullable String paxAppId,
     @Nullable String userId,
@@ -37,16 +67,19 @@ public class DemandResponsiveExtData implements Serializable {
     @Nullable Passengers passengers,
     @Nullable List<PassengerFareType> passengerFareType
   ) {
-    this.paxAppId = paxAppId;
-    this.userId = userId;
-    this.areaId = areaId;
-    this.rideType = rideType;
-    this.passengers = passengers;
-    this.passengerFareType = passengerFareType;
+    this(
+      paxAppId,
+      userId,
+      areaId,
+      rideType,
+      passengers,
+      passengerFareType,
+      DEFAULT_EGRESS_RELUCTANCE
+    );
   }
 
   /**
-   * Backwards-compatible constructor without passengerFareType.
+   * Backwards-compatible constructor without passengerFareType and egressReluctance.
    */
   public DemandResponsiveExtData(
     @Nullable String paxAppId,
@@ -55,7 +88,7 @@ public class DemandResponsiveExtData implements Serializable {
     @Nullable String rideType,
     @Nullable Passengers passengers
   ) {
-    this(paxAppId, userId, areaId, rideType, passengers, null);
+    this(paxAppId, userId, areaId, rideType, passengers, null, DEFAULT_EGRESS_RELUCTANCE);
   }
 
   /**
@@ -107,6 +140,17 @@ public class DemandResponsiveExtData implements Serializable {
     return passengerFareType;
   }
 
+  /**
+   * Reluctance multiplier applied to CAR-based egress generalized cost before RAPTOR routing.
+   * A value of 1.0 means no inflation (default). Values greater than 1.0 make DRT egress paths
+   * appear more expensive, preventing them from unfairly filtering out transit-only itineraries.
+   * This compensates for the fact that real DRT travel times (applied during decoration) are
+   * typically longer than plain CAR routing estimates used during RAPTOR.
+   */
+  public double egressReluctance() {
+    return egressReluctance;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -118,13 +162,22 @@ public class DemandResponsiveExtData implements Serializable {
       Objects.equals(areaId, that.areaId) &&
       Objects.equals(rideType, that.rideType) &&
       Objects.equals(passengers, that.passengers) &&
-      Objects.equals(passengerFareType, that.passengerFareType)
+      Objects.equals(passengerFareType, that.passengerFareType) &&
+      Double.compare(egressReluctance, that.egressReluctance) == 0
     );
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(paxAppId, userId, areaId, rideType, passengers, passengerFareType);
+    return Objects.hash(
+      paxAppId,
+      userId,
+      areaId,
+      rideType,
+      passengers,
+      passengerFareType,
+      egressReluctance
+    );
   }
 
   @Override
@@ -147,6 +200,8 @@ public class DemandResponsiveExtData implements Serializable {
       passengers +
       ", passengerFareType=" +
       passengerFareType +
+      ", egressReluctance=" +
+      egressReluctance +
       '}'
     );
   }
@@ -162,6 +217,7 @@ public class DemandResponsiveExtData implements Serializable {
     private String rideType;
     private Passengers passengers;
     private List<PassengerFareType> passengerFareType;
+    private double egressReluctance = DEFAULT_EGRESS_RELUCTANCE;
 
     public Builder paxAppId(String paxAppId) {
       this.paxAppId = paxAppId;
@@ -193,6 +249,11 @@ public class DemandResponsiveExtData implements Serializable {
       return this;
     }
 
+    public Builder egressReluctance(double egressReluctance) {
+      this.egressReluctance = egressReluctance;
+      return this;
+    }
+
     public DemandResponsiveExtData build() {
       return new DemandResponsiveExtData(
         paxAppId,
@@ -200,7 +261,8 @@ public class DemandResponsiveExtData implements Serializable {
         areaId,
         rideType,
         passengers,
-        passengerFareType
+        passengerFareType,
+        egressReluctance
       );
     }
   }

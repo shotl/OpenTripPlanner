@@ -208,6 +208,9 @@ public class RouteRequestMapper {
         .map(ft -> new PassengerFareType(ft.getGraphQLType(), ft.getGraphQLCount()))
         .collect(java.util.stream.Collectors.toList());
     }
+    double egressReluctance = drtInput.getGraphQLEgressReluctance() != null
+      ? drtInput.getGraphQLEgressReluctance()
+      : DemandResponsiveExtData.DEFAULT_EGRESS_RELUCTANCE;
     request.setDemandResponsiveExtData(
       new DemandResponsiveExtData(
         drtInput.getGraphQLPaxAppId(),
@@ -217,7 +220,8 @@ public class RouteRequestMapper {
         passengers != null
           ? new Passengers(passengers.getGraphQLRegular(), passengers.getGraphQLWheelchair())
           : null,
-        passengerFareTypes
+        passengerFareTypes,
+        egressReluctance
       )
     );
   }
@@ -232,7 +236,8 @@ public class RouteRequestMapper {
       drtInput.getGraphQLUserId() != null ||
       drtInput.getGraphQLAreaId() != null ||
       drtInput.getGraphQLRideType() != null ||
-      drtInput.getGraphQLPassengers() != null
+      drtInput.getGraphQLPassengers() != null ||
+      drtInput.getGraphQLEgressReluctance() != null
     );
   }
 }

@@ -2092,6 +2092,8 @@ scalar Time
 input DRTInput {
   "Area ID for the DRT service."
   areaId: String
+  "Reluctance multiplier applied to CAR-based egress generalized cost before RAPTOR routing. A value of 1.0 (default) means no cost inflation. Values greater than 1.0 make DRT egress paths appear more expensive, compensating for the fact that real DRT travel times are typically longer than plain CAR routing estimates."
+  egressReluctance: Float = 1.0
   "Passenger information for the DRT ride."
   passengers: DRTPassengersInput
   "Passenger app ID."

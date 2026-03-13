@@ -122,6 +122,11 @@ public class TripRequestMapper {
     String areaId = (String) drtInput.get("areaId");
     String rideType = (String) drtInput.get("rideType");
 
+    double egressReluctance = DemandResponsiveExtData.DEFAULT_EGRESS_RELUCTANCE;
+    if (drtInput.get("egressReluctance") != null) {
+      egressReluctance = ((Number) drtInput.get("egressReluctance")).doubleValue();
+    }
+
     Passengers passengers = null;
     Map<String, Object> passengersMap = (Map<String, Object>) drtInput.get("passengers");
     if (passengersMap != null) {
@@ -137,7 +142,15 @@ public class TripRequestMapper {
       paxAppId != null || userId != null || areaId != null || rideType != null || passengers != null
     ) {
       request.setDemandResponsiveExtData(
-        new DemandResponsiveExtData(paxAppId, userId, areaId, rideType, passengers)
+        new DemandResponsiveExtData(
+          paxAppId,
+          userId,
+          areaId,
+          rideType,
+          passengers,
+          null,
+          egressReluctance
+        )
       );
     }
   }

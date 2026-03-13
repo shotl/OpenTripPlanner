@@ -39,6 +39,7 @@ import org.opentripplanner.routing.algorithm.raptoradapter.transit.mappers.Rapto
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.request.RaptorRoutingRequestTransitData;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.request.RouteRequestTransitDataProviderFilter;
 import org.opentripplanner.routing.algorithm.transferoptimization.configure.TransferOptimizationServiceConfigurator;
+import org.opentripplanner.routing.api.request.DemandResponsiveExtData;
 import org.opentripplanner.routing.api.request.RouteRequest;
 import org.opentripplanner.routing.api.request.StreetMode;
 import org.opentripplanner.routing.api.request.preference.AccessEgressPreferences;
@@ -274,6 +275,19 @@ public class TransitRouter {
         p.withScooter(s -> s.withRental(r -> r.withAllowArrivingInRentedVehicleAtDestination(false))
         );
       });
+    }
+
+    // When egress mode is DRT, replace the car reluctance used during the A* street search
+    // with the DRT egress reluctance. This compensates for the fact that real DRT travel
+    // times (applied during decoration) are typically longer than plain CAR routing estimates,
+    // preventing DRT egress itineraries from unfairly filtering out transit-only alternatives.
+    if (
+      type.isEgress() &&
+      mode == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION &&
+      accessRequest.demandResponsiveExtData() != null
+    ) {
+      double egressReluctance = accessRequest.demandResponsiveExtData().egressReluctance();
+      accessRequest.withPreferences(p -> p.withCar(c -> c.withReluctance(egressReluctance)));
     }
 
     AccessEgressPreferences accessEgressPreferences = accessRequest

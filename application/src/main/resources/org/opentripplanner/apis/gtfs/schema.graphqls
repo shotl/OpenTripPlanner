@@ -4126,6 +4126,14 @@ input CyclingOptimizationInput @oneOf {
 input DRTInput {
   "Area ID for the DRT service."
   areaId: String
+  """
+  Reluctance multiplier applied to CAR-based egress generalized cost before RAPTOR routing.
+  A value of 1.0 (default) means no cost inflation. Values greater than 1.0 make DRT egress
+  paths appear more expensive during routing, compensating for the fact that real DRT travel
+  times are typically longer than plain CAR routing estimates. This prevents transit-only
+  itineraries from being unfairly filtered out when DRT is used as egress mode.
+  """
+  egressReluctance: Float = 1.0
   "Optional passenger fare types for pricing calculation."
   passengerFareType: [DRTPassengerFareTypeInput!]
   "Passenger information for the DRT ride."

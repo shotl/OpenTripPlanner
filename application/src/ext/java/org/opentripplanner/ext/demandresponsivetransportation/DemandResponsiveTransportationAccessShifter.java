@@ -41,6 +41,8 @@ public class DemandResponsiveTransportationAccessShifter {
     if (!isAccess) {
       // Egress shifting is deferred to the leg decoration phase (DecorateWithDRT),
       // which has the actual transit arrival time to use as the pickup time.
+      // The DRT egress reluctance is already applied during the CAR street search
+      // (in TransitRouter.fetchAccessEgresses) to inflate the egress generalized cost.
       return results;
     }
 
