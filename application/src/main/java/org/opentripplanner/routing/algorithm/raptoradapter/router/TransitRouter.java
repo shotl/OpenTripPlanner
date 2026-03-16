@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -52,11 +53,15 @@ import org.opentripplanner.routing.framework.DebugTimingAggregator;
 import org.opentripplanner.routing.graphfinder.NearbyStop;
 import org.opentripplanner.routing.via.ViaCoordinateTransferFactory;
 import org.opentripplanner.standalone.api.OtpServerRequestContext;
+import org.opentripplanner.street.model.edge.Edge;
+import org.opentripplanner.street.model.edge.StreetEdge;
 import org.opentripplanner.street.search.TemporaryVerticesContainer;
+import org.opentripplanner.street.search.state.State;
 import org.opentripplanner.transit.model.framework.EntityNotFoundException;
 import org.opentripplanner.transit.model.framework.FeedScopedId;
 import org.opentripplanner.transit.model.network.grouppriority.TransitGroupPriorityService;
 import org.opentripplanner.transit.model.site.StopLocation;
+import org.opentripplanner.utils.time.DurationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -146,6 +151,10 @@ public class TransitRouter {
       accessEgresses.getAccesses().size(),
       accessEgresses.getEgresses().size()
     );
+
+    // Log access/egress paths before RAPTOR
+    logAccessEgressPaths("ACCESS", accessEgresses.getAccesses(), raptorTransitData);
+    logAccessEgressPaths("EGRESS", accessEgresses.getEgresses(), raptorTransitData);
 
     // Prepare transit search
     var raptorRequest = RaptorRequestMapper.<TripSchedule>mapRequest(
@@ -677,5 +686,94 @@ public class TransitRouter {
     }
 
     return expanded;
+  }
+
+  /**
+   * Log a nicely formatted summary of access or egress paths just before the RAPTOR search.
+   * Each entry shows the target stop (name + id), duration, generalized cost, traversal mode,
+   * and the sequence of street edges forming the path.
+   */
+  private void logAccessEgressPaths(
+    String label,
+    Collection<? extends RoutingAccessEgress> paths,
+    RaptorTransitData raptorTransitData
+  ) {
+    if (!LOG.isInfoEnabled() || paths.isEmpty()) {
+      return;
+    }
+    int index = 1;
+    for (var path : paths) {
+      // Only log paths that contain a CAR mode segment
+      if (!path.getLastState().containsModeCar()) {
+        continue;
+      }
+      StopLocation stop = raptorTransitData.getStopByIndex(path.stop());
+      String stopName = stop != null ? stop.getName().toString() : "?";
+      String stopId = stop != null ? stop.getId().toString() : String.valueOf(path.stop());
+      String duration = DurationUtils.durationToStr(path.durationInSeconds());
+      String cost = String.format("%.2f", path.c1() / 100.0);
+      String edgePath = buildEdgePath(path.getLastState());
+      String coords = buildPathEndpoints(path.getLastState());
+
+      LOG.info(
+        "  [{}] {} stop={} ({}) | duration={} | cost={} | coords={} | path=[{}]",
+        index++,
+        label,
+        stopName,
+        stopId,
+        duration,
+        cost,
+        coords,
+        edgePath
+      );
+    }
+  }
+
+  /**
+   * Walk backwards through the A* State chain and collect the distinct, ordered street edge
+   * names to produce a compact human-readable path description.
+   */
+  private static String buildEdgePath(State lastState) {
+    if (lastState == null) {
+      return "";
+    }
+    var edgeNames = new LinkedHashSet<String>();
+    State s = lastState;
+    while (s != null) {
+      Edge edge = s.getBackEdge();
+      if (edge instanceof StreetEdge streetEdge) {
+        String name = streetEdge.getName() != null ? streetEdge.getName().toString() : null;
+        if (name != null && !name.isBlank()) {
+          edgeNames.add(name);
+        }
+      }
+      s = s.getBackState();
+    }
+    return String.join(" -> ", edgeNames);
+  }
+
+  /**
+   * Return a string with the coordinates of the first and last vertex in the State chain,
+   * e.g. "(lat1,lon1) -> (lat2,lon2)".
+   */
+  private static String buildPathEndpoints(State lastState) {
+    if (lastState == null) {
+      return "";
+    }
+    // Last vertex is on the lastState itself
+    var lastVertex = lastState.getVertex();
+    // Walk back to the root state (first vertex)
+    State s = lastState;
+    while (s.getBackState() != null) {
+      s = s.getBackState();
+    }
+    var firstVertex = s.getVertex();
+    return String.format(
+      "(%.6f,%.6f) -> (%.6f,%.6f)",
+      firstVertex.getLat(),
+      firstVertex.getLon(),
+      lastVertex.getLat(),
+      lastVertex.getLon()
+    );
   }
 }

@@ -31,17 +31,17 @@ public class Itinerary implements ItinerarySortKey {
 
   public static final int UNKNOWN = -1;
 
-  /* final primitive properties */
-  private final Duration duration;
-  private final Duration transitDuration;
-  private final int numberOfTransfers;
-  private final Duration waitingDuration;
-  private final double nonTransitDistanceMeters;
-  private final boolean walkOnly;
-  private final boolean streetOnly;
-  private final Duration nonTransitDuration;
-  private final Duration walkDuration;
-  private final double walkDistanceMeters;
+  /* primitive properties derived from legs — recalculated whenever legs change */
+  private Duration duration;
+  private Duration transitDuration;
+  private int numberOfTransfers;
+  private Duration waitingDuration;
+  private double nonTransitDistanceMeters;
+  private boolean walkOnly;
+  private boolean streetOnly;
+  private Duration nonTransitDuration;
+  private Duration walkDuration;
+  private double walkDistanceMeters;
 
   /* mutable primitive properties */
   private Double elevationLost = 0.0;
@@ -70,23 +70,8 @@ public class Itinerary implements ItinerarySortKey {
   private ItineraryFares fare = ItineraryFares.empty();
 
   private Itinerary(List<Leg> legs, boolean searchWindowAware) {
-    setLegs(legs);
     this.searchWindowAware = searchWindowAware;
-
-    // Set aggregated data
-    ItinerariesCalculateLegTotals totals = new ItinerariesCalculateLegTotals(legs);
-    this.duration = totals.totalDuration;
-    this.numberOfTransfers = totals.transfers();
-    this.transitDuration = totals.transitDuration;
-    this.nonTransitDuration = totals.nonTransitDuration;
-    this.nonTransitDistanceMeters = DoubleUtils.roundTo2Decimals(totals.nonTransitDistanceMeters);
-    this.walkDuration = totals.walkDuration;
-    this.walkDistanceMeters = totals.walkDistanceMeters;
-    this.waitingDuration = totals.waitingDuration;
-    this.walkOnly = totals.walkOnly;
-    this.streetOnly = totals.streetOnly;
-    this.setElevationGained(totals.totalElevationGained);
-    this.setElevationLost(totals.totalElevationLost);
+    setLegs(legs);
   }
 
   /**
@@ -362,6 +347,23 @@ public class Itinerary implements ItinerarySortKey {
 
   public void setLegs(List<Leg> legs) {
     this.legs = List.copyOf(legs);
+    recalculateTotals();
+  }
+
+  private void recalculateTotals() {
+    ItinerariesCalculateLegTotals totals = new ItinerariesCalculateLegTotals(this.legs);
+    this.duration = totals.totalDuration;
+    this.numberOfTransfers = totals.transfers();
+    this.transitDuration = totals.transitDuration;
+    this.nonTransitDuration = totals.nonTransitDuration;
+    this.nonTransitDistanceMeters = DoubleUtils.roundTo2Decimals(totals.nonTransitDistanceMeters);
+    this.walkDuration = totals.walkDuration;
+    this.walkDistanceMeters = totals.walkDistanceMeters;
+    this.waitingDuration = totals.waitingDuration;
+    this.walkOnly = totals.walkOnly;
+    this.streetOnly = totals.streetOnly;
+    this.setElevationGained(totals.totalElevationGained);
+    this.setElevationLost(totals.totalElevationLost);
   }
 
   /**

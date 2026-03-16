@@ -544,6 +544,7 @@ public class ItineraryListFilterChainBuilder {
 
       if (demandResponsiveTransportationDecorator != null) {
         filters.add(demandResponsiveTransportationDecorator);
+        addSort(filters, SortOrderComparator.comparator(sortOrder));
       }
 
       if (stopConsolidationDecorator != null) {

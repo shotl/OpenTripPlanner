@@ -58,14 +58,62 @@ public class DecorateWithDRT implements ItineraryListFilter {
   private Itinerary addDRTInformation(Itinerary i, DemandResponsiveTransportationService service) {
     if (!i.isFlaggedForDeletion()) {
       var allLegs = i.getLegs();
-      var legs = allLegs
+      var decoratedLegs = allLegs
         .parallelStream()
         .map(leg -> decorateLegWithRideEstimate(i, leg, allLegs, service))
         .toList();
 
-      i.setLegs(fixTemporalOverlaps(legs));
+      if (!i.isFlaggedForDeletion()) {
+        updateEgressGeneralizedCost(i, allLegs, decoratedLegs);
+      }
+      i.setLegs(fixTemporalOverlaps(decoratedLegs));
     }
     return i;
+  }
+
+  /**
+   * Adjusts the itinerary's generalized cost to reflect the real DRT egress duration reported by
+   * the DRT provider, replacing the stale A* street-routing cost for each decorated egress leg.
+   * <p>
+   * The new cost uses the same formula as the access adapter:
+   * {@code (walkToPickup + walkFromDropoff) × walkReluctance + drtDuration × carReluctance}
+   */
+  private void updateEgressGeneralizedCost(
+    Itinerary itinerary,
+    List<Leg> originalLegs,
+    List<Leg> decoratedLegs
+  ) {
+    if (itinerary.getGeneralizedCost() == Itinerary.UNKNOWN) {
+      return;
+    }
+    int costDelta = 0;
+    for (int idx = 0; idx < originalLegs.size(); idx++) {
+      Leg original = originalLegs.get(idx);
+      Leg decorated = decoratedLegs.get(idx);
+      if (decorated instanceof DRTLeg drtLeg && isEgressLeg(original, originalLegs)) {
+        int oldCost = original.getGeneralizedCost();
+        int newCost = computeEgressDrtCost(drtLeg.rideEstimate());
+        costDelta += newCost - oldCost;
+      }
+    }
+    if (costDelta != 0) {
+      itinerary.setGeneralizedCost(itinerary.getGeneralizedCost() + costDelta);
+    }
+  }
+
+  private int computeEgressDrtCost(ShotlArrivalEstimateResponse estimate) {
+    long walkToPickup = estimate.pickup_walking_seconds() != null
+      ? estimate.pickup_walking_seconds()
+      : 0L;
+    long walkFromDropoff = estimate.dropoff_walking_seconds() != null
+      ? estimate.dropoff_walking_seconds()
+      : 0L;
+    long drtDuration = estimate.user_expected_dropoff_time() - estimate.user_expected_pickup_time();
+    double walkReluctance = request.preferences().walk().reluctance();
+    double carReluctance = request.preferences().car().reluctance();
+    return (int) Math.round(
+      (walkToPickup + walkFromDropoff) * walkReluctance + drtDuration * carReluctance
+    );
   }
 
   /**
