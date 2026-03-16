@@ -32,6 +32,7 @@ import org.opentripplanner.routing.algorithm.filterchain.filters.system.mcmax.Mc
 import org.opentripplanner.routing.algorithm.filterchain.filters.transit.DecorateTransitAlert;
 import org.opentripplanner.routing.algorithm.filterchain.filters.transit.KeepItinerariesWithFewestTransfers;
 import org.opentripplanner.routing.algorithm.filterchain.filters.transit.RemoveItinerariesWithShortStreetLeg;
+import org.opentripplanner.routing.algorithm.filterchain.filters.transit.RemoveShortTransitItinerariesFilter;
 import org.opentripplanner.routing.algorithm.filterchain.filters.transit.RemoveTransitIfStreetOnlyIsBetter;
 import org.opentripplanner.routing.algorithm.filterchain.filters.transit.RemoveTransitIfWalkingIsBetter;
 import org.opentripplanner.routing.algorithm.filterchain.filters.transit.TransitGeneralizedCostFilter;
@@ -91,6 +92,7 @@ public class ItineraryListFilterChainBuilder {
   private ItinerarySortKey itineraryPageCut;
   private boolean transitGroupPriorityUsed = false;
   private boolean filterDirectFlexBySearchWindow = true;
+  private Duration minTransitDuration = null;
 
   /**
    * Sandbox filters which decorate the itineraries with extra information.
@@ -453,6 +455,11 @@ public class ItineraryListFilterChainBuilder {
         addRemoveFilter(filters, new RemoveTransitIfWalkingIsBetter());
       }
 
+      // Remove itineraries with transit legs shorter than the configured minimum
+      if (minTransitDuration != null) {
+        addRemoveFilter(filters, new RemoveShortTransitItinerariesFilter(minTransitDuration));
+      }
+
       if (removeWalkAllTheWayResults) {
         addRemoveFilter(filters, new RemoveWalkOnlyFilter());
       }
@@ -555,6 +562,15 @@ public class ItineraryListFilterChainBuilder {
     var debugHandler = new DeleteResultHandler(debug, maxNumberOfItineraries);
 
     return new ItineraryListFilterChain(filters, debugHandler);
+  }
+
+  /**
+   * Remove itineraries that contain a transit leg shorter than the given duration.
+   * Use this to filter out very short transit hops that are not worth taking.
+   */
+  public ItineraryListFilterChainBuilder withMinTransitDuration(Duration minTransitDuration) {
+    this.minTransitDuration = minTransitDuration;
+    return this;
   }
 
   public ItineraryListFilterChainBuilder withFilterDirectFlexBySearchWindow(boolean b) {

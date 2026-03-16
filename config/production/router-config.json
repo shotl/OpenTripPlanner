@@ -6,5 +6,10 @@
             "estimationsURL": "http://rides-api.shotl.svc.cluster.local/",
             "providerName": "Shotl"
         }
-    ]
+    ],
+    "routingDefaults": {
+      "itineraryFilters": {
+        "minTransitDuration": "4m"
+      }
+    }
 }

@@ -8,6 +8,7 @@ import static org.opentripplanner.standalone.config.framework.json.OtpVersion.V2
 import static org.opentripplanner.standalone.config.framework.json.OtpVersion.V2_4;
 import static org.opentripplanner.standalone.config.framework.json.OtpVersion.V2_7;
 
+import java.time.Duration;
 import org.opentripplanner.routing.algorithm.filterchain.api.TransitGeneralizedCostFilterParams;
 import org.opentripplanner.routing.api.request.preference.ItineraryFilterDebugProfile;
 import org.opentripplanner.routing.api.request.preference.ItineraryFilterPreferences;
@@ -283,8 +284,28 @@ public class ItineraryFiltersConfig {
             """
           )
           .asBoolean(true)
+      );
+
+    var minTransitDuration = c
+      .of("minTransitDuration")
+      .since(V2_7)
+      .summary(
+        "Remove itineraries that contain a transit leg with a duration shorter than this value."
       )
-      .build();
+      .description(
+        """
+        This is useful to filter out very short transit hops that are not worth taking.
+        For example, a value of "5m" will remove itineraries where any transit leg is shorter
+        than 5 minutes. If not set, no filtering by transit leg duration is applied.
+        """
+      )
+      .asDuration(dft.minTransitDuration());
+
+    if (minTransitDuration != null) {
+      builder.withMinTransitDuration(minTransitDuration);
+    }
+
+    builder.build();
   }
 
   private static TransitGeneralizedCostFilterParams parseTransitGeneralizedCostLimit(

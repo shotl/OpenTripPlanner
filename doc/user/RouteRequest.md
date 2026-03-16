@@ -119,6 +119,7 @@ and in the [transferRequests in build-config.json](BuildConfiguration.md#transfe
 |    groupSimilarityKeepThree                                                                                  |        `double`        | Reduce the number of itineraries to three itineraries by reducing each group of itineraries grouped by 68% similarity.                                   | *Optional* | `0.68`           |  2.1  |
 |    [groupedOtherThanSameLegsMaxCostMultiplier](#rd_if_groupedOtherThanSameLegsMaxCostMultiplier)             |        `double`        | Filter grouped itineraries, where the non-grouped legs are more expensive than in the lowest cost one.                                                   | *Optional* | `2.0`            |  2.1  |
 |    [minBikeParkingDistance](#rd_if_minBikeParkingDistance)                                                   |        `double`        | Filter out bike park+ride results that have fewer meters of cycling than this value.                                                                     | *Optional* | `0.0`            |  2.3  |
+|    [minTransitDuration](#rd_if_minTransitDuration)                                                           |       `duration`       | Remove itineraries that contain a transit leg with a duration shorter than this value.                                                                   | *Optional* |                  |  2.7  |
 |    [nonTransitGeneralizedCostLimit](#rd_if_nonTransitGeneralizedCostLimit)                                   | `cost-linear-function` | The function define a max-limit for generalized-cost for non-transit itineraries.                                                                        | *Optional* | `"1h + 2.0 t"`   |  2.1  |
 |    [parkAndRideDurationRatio](#rd_if_parkAndRideDurationRatio)                                               |        `double`        | Filter P+R routes that consist of driving and walking by the minimum fraction of the driving using of _time_.                                            | *Optional* | `0.0`            |  2.1  |
 |    [removeItinerariesWithSameRoutesAndStops](#rd_if_removeItinerariesWithSameRoutesAndStops)                 |        `boolean`       | Set to true if you want to list only the first itinerary  which goes through the same stops and routes.                                                  | *Optional* | `false`          |  2.2  |
@@ -809,6 +810,18 @@ having a higher cost will be filtered.
 Filter out bike park+ride results that have fewer meters of cycling than this value.
 
 Useful if you want to exclude those routes which have only a few meters of cycling before parking the bike and taking public transport.
+
+<h3 id="rd_if_minTransitDuration">minTransitDuration</h3>
+
+**Since version:** `2.7` ∙ **Type:** `duration` ∙ **Cardinality:** `Optional`   
+**Path:** /routingDefaults/itineraryFilters 
+
+Remove itineraries that contain a transit leg with a duration shorter than this value.
+
+This is useful to filter out very short transit hops that are not worth taking.
+For example, a value of "5m" will remove itineraries where any transit leg is shorter
+than 5 minutes. If not set, no filtering by transit leg duration is applied.
+
 
 <h3 id="rd_if_nonTransitGeneralizedCostLimit">nonTransitGeneralizedCostLimit</h3>
 

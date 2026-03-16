@@ -5,7 +5,7 @@
             "enabled": true,
             "estimationsURL": "http://localhost:60011/",
             "providerName": "Shotl"
-        }   
+        }
     ],
     "routingDefaults": {
         "accessEgress": {
@@ -16,6 +16,9 @@
                 "WALK": "PT10M",
                 "DEMAND_RESPONSIVE_TRANSPORTATION": "PT30M"
             }
+        },
+        "itineraryFilters": {
+          "minTransitDuration": "4m"
         }
     }
 }

@@ -96,6 +96,10 @@ public class RouteRequestToFilterChainMapper {
       .withFilterDirectFlexBySearchWindow(params.filterDirectFlexBySearchWindow())
       .withDebugEnabled(params.debug());
 
+    if (params.minTransitDuration() != null) {
+      builder.withMinTransitDuration(params.minTransitDuration());
+    }
+
     if (!request.preferences().transit().relaxTransitGroupPriority().isNormal()) {
       builder.withTransitGroupPriority();
     }

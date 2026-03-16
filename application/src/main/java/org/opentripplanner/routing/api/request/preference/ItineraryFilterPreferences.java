@@ -32,6 +32,7 @@ public final class ItineraryFilterPreferences {
   private final TransitGeneralizedCostFilterParams transitGeneralizedCostLimit;
   private final CostLinearFunction removeTransitWithHigherCostThanBestOnStreetOnly;
   private final boolean filterDirectFlexBySearchWindow;
+  private final Duration minTransitDuration;
 
   private ItineraryFilterPreferences() {
     this.accessibilityScore = false;
@@ -51,6 +52,7 @@ public final class ItineraryFilterPreferences {
     );
     this.removeTransitWithHigherCostThanBestOnStreetOnly = null;
     this.filterDirectFlexBySearchWindow = true;
+    this.minTransitDuration = null;
   }
 
   private ItineraryFilterPreferences(Builder builder) {
@@ -74,6 +76,7 @@ public final class ItineraryFilterPreferences {
     this.removeTransitWithHigherCostThanBestOnStreetOnly =
       builder.removeTransitWithHigherCostThanBestOnStreetOnly;
     this.filterDirectFlexBySearchWindow = builder.filterDirectFlexBySearchWindow;
+    this.minTransitDuration = builder.minTransitDuration;
   }
 
   public static Builder of() {
@@ -140,6 +143,10 @@ public final class ItineraryFilterPreferences {
     return filterDirectFlexBySearchWindow;
   }
 
+  public Duration minTransitDuration() {
+    return minTransitDuration;
+  }
+
   @Override
   public String toString() {
     return ToStringBuilder.of(ItineraryFilterPreferences.class)
@@ -187,6 +194,7 @@ public final class ItineraryFilterPreferences {
         removeItinerariesWithSameRoutesAndStops
       )
       .addBoolIfTrue("filterDirectFlexBySearchWindow", filterDirectFlexBySearchWindow)
+      .addObj("minTransitDuration", minTransitDuration, DEFAULT.minTransitDuration)
       .toString();
   }
 
@@ -216,7 +224,8 @@ public final class ItineraryFilterPreferences {
         that.removeTransitWithHigherCostThanBestOnStreetOnly
       ) &&
       Objects.equals(transitGeneralizedCostLimit, that.transitGeneralizedCostLimit) &&
-      filterDirectFlexBySearchWindow == that.filterDirectFlexBySearchWindow
+      filterDirectFlexBySearchWindow == that.filterDirectFlexBySearchWindow &&
+      Objects.equals(minTransitDuration, that.minTransitDuration)
     );
   }
 
@@ -236,7 +245,8 @@ public final class ItineraryFilterPreferences {
       removeItinerariesWithSameRoutesAndStops,
       transitGeneralizedCostLimit,
       removeTransitWithHigherCostThanBestOnStreetOnly,
-      filterDirectFlexBySearchWindow
+      filterDirectFlexBySearchWindow,
+      minTransitDuration
     );
   }
 
@@ -257,6 +267,7 @@ public final class ItineraryFilterPreferences {
     private TransitGeneralizedCostFilterParams transitGeneralizedCostLimit;
     private CostLinearFunction removeTransitWithHigherCostThanBestOnStreetOnly;
     private boolean filterDirectFlexBySearchWindow;
+    private Duration minTransitDuration;
 
     public ItineraryFilterPreferences original() {
       return original;
@@ -360,6 +371,7 @@ public final class ItineraryFilterPreferences {
       this.removeTransitWithHigherCostThanBestOnStreetOnly =
         original.removeTransitWithHigherCostThanBestOnStreetOnly;
       this.filterDirectFlexBySearchWindow = original.filterDirectFlexBySearchWindow;
+      this.minTransitDuration = original.minTransitDuration;
     }
 
     public Builder apply(Consumer<Builder> body) {
@@ -374,6 +386,11 @@ public final class ItineraryFilterPreferences {
 
     public Builder withFilterDirectFlexBySearchWindow(boolean filterDirectFlexBySearchWindow) {
       this.filterDirectFlexBySearchWindow = filterDirectFlexBySearchWindow;
+      return this;
+    }
+
+    public Builder withMinTransitDuration(Duration minTransitDuration) {
+      this.minTransitDuration = minTransitDuration;
       return this;
     }
   }
