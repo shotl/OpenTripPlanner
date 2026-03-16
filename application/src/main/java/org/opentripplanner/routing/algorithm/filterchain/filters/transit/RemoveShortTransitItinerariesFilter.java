@@ -6,8 +6,8 @@ import org.opentripplanner.model.plan.Itinerary;
 import org.opentripplanner.routing.algorithm.filterchain.framework.spi.RemoveItineraryFlagger;
 
 /**
- * Removes itineraries that contain a transit leg with a duration shorter than the configured
- * minimum. This is useful to filter out very short transit hops that are not worth taking.
+ * Removes itineraries where the total duration of all transit legs combined is shorter than the
+ * configured minimum. This is useful to filter out itineraries that barely use public transport.
  */
 public class RemoveShortTransitItinerariesFilter implements RemoveItineraryFlagger {
 
@@ -26,10 +26,14 @@ public class RemoveShortTransitItinerariesFilter implements RemoveItineraryFlagg
 
   @Override
   public Predicate<Itinerary> shouldBeFlaggedForRemoval() {
-    return itinerary ->
-      itinerary
+    return itinerary -> {
+      Duration totalTransit = itinerary
         .getLegs()
         .stream()
-        .anyMatch(leg -> leg.isTransitLeg() && leg.getDuration().compareTo(minTransitDuration) < 0);
+        .filter(leg -> leg.isTransitLeg())
+        .map(leg -> leg.getDuration())
+        .reduce(Duration.ZERO, Duration::plus);
+      return !totalTransit.isZero() && totalTransit.compareTo(minTransitDuration) < 0;
+    };
   }
 }
