@@ -1,15 +1,16 @@
 {
-  "transitServiceStart" : "-P1M",
-  "transitServiceEnd" : "P1Y",
-  "osmCacheDataInMem" : true,
-  "localFileNamePatterns" : {
-    "osm" : "(i?)\\.osm\\.pbf$",
-    "dem" : "(i?)\\.dem\\.tiff?$",
-    "gtfs" : "(?i)gtfs",
-    "netex" : "(?i)netex"
+  "transitServiceStart": "-P1M",
+  "transitServiceEnd": "P1Y",
+  "transitModelTimeZone": "Europe/Rome",
+  "osmCacheDataInMem": true,
+  "localFileNamePatterns": {
+    "osm": "(i?)\\.osm\\.pbf$",
+    "dem": "(i?)\\.dem\\.tiff?$",
+    "gtfs": "(?i)gtfs",
+    "netex": "(?i)netex"
   },
-  "osmDefaults" : {
-    "timeZone" : "Europe/Rome",
-    "osmTagMapping" : "default"
+  "osmDefaults": {
+    "timeZone": "Europe/Rome",
+    "osmTagMapping": "default"
   }
 }
