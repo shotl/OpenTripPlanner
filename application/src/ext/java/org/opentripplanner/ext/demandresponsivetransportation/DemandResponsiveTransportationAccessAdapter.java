@@ -1,6 +1,8 @@
 package org.opentripplanner.ext.demandresponsivetransportation;
 
 import java.time.Duration;
+import javax.annotation.Nullable;
+import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.framework.model.TimeAndCost;
 import org.opentripplanner.raptor.api.model.RaptorCostConverter;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.DefaultAccessEgress;
@@ -31,6 +33,9 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
   private final double walkReluctance;
   private final double carReluctance;
 
+  @Nullable
+  private final ShotlArrivalEstimateResponse shotlResponse;
+
   public DemandResponsiveTransportationAccessAdapter(
     RoutingAccessEgress access,
     Duration arrival,
@@ -38,7 +43,8 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
     long walkToPickupSeconds,
     long walkFromDropoffSeconds,
     double walkReluctance,
-    double carReluctance
+    double carReluctance,
+    @Nullable ShotlArrivalEstimateResponse shotlResponse
   ) {
     super(
       access.stop(),
@@ -59,6 +65,7 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
     this.walkFromDropoffSeconds = (int) walkFromDropoffSeconds;
     this.walkReluctance = walkReluctance;
     this.carReluctance = carReluctance;
+    this.shotlResponse = shotlResponse;
   }
 
   public DemandResponsiveTransportationAccessAdapter(
@@ -72,6 +79,7 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
     this.walkFromDropoffSeconds = other.walkFromDropoffSeconds;
     this.walkReluctance = other.walkReluctance;
     this.carReluctance = other.carReluctance;
+    this.shotlResponse = other.shotlResponse;
   }
 
   /**
@@ -95,7 +103,8 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
       this.walkFromDropoffSeconds + additionalWalkSeconds,
       this.walkReluctance,
       this.carReluctance,
-      this.getLastState()
+      this.getLastState(),
+      this.shotlResponse
     );
   }
 
@@ -107,7 +116,8 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
     int walkFromDropoffSeconds,
     double walkReluctance,
     double carReluctance,
-    org.opentripplanner.street.search.state.State lastState
+    org.opentripplanner.street.search.state.State lastState,
+    @Nullable ShotlArrivalEstimateResponse shotlResponse
   ) {
     super(
       stopIndex,
@@ -128,6 +138,7 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
     this.walkFromDropoffSeconds = walkFromDropoffSeconds;
     this.walkReluctance = walkReluctance;
     this.carReluctance = carReluctance;
+    this.shotlResponse = shotlResponse;
   }
 
   @Override
@@ -159,6 +170,23 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
   @Override
   public RoutingAccessEgress withPenalty(TimeAndCost penalty) {
     return new DemandResponsiveTransportationAccessAdapter(this, penalty);
+  }
+
+  /**
+   * Returns the original Shotl API response stored during the access shifting phase,
+   * or {@code null} if no response was stored (e.g., for the no-shift case).
+   */
+  @Nullable
+  public ShotlArrivalEstimateResponse getShotlResponse() {
+    return shotlResponse;
+  }
+
+  public double getWalkReluctance() {
+    return walkReluctance;
+  }
+
+  public double getCarReluctance() {
+    return carReluctance;
   }
 
   @Override

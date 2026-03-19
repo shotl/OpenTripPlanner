@@ -92,28 +92,13 @@ public class DecorateWithDRT implements ItineraryListFilter {
       Leg decorated = decoratedLegs.get(idx);
       if (decorated instanceof DRTLeg drtLeg && isEgressLeg(original, originalLegs)) {
         int oldCost = original.getGeneralizedCost();
-        int newCost = computeEgressDrtCost(drtLeg.rideEstimate());
+        int newCost = drtLeg.getGeneralizedCost();
         costDelta += newCost - oldCost;
       }
     }
     if (costDelta != 0) {
       itinerary.setGeneralizedCost(itinerary.getGeneralizedCost() + costDelta);
     }
-  }
-
-  private int computeEgressDrtCost(ShotlArrivalEstimateResponse estimate) {
-    long walkToPickup = estimate.pickup_walking_seconds() != null
-      ? estimate.pickup_walking_seconds()
-      : 0L;
-    long walkFromDropoff = estimate.dropoff_walking_seconds() != null
-      ? estimate.dropoff_walking_seconds()
-      : 0L;
-    long drtDuration = estimate.user_expected_dropoff_time() - estimate.user_expected_pickup_time();
-    double walkReluctance = request.preferences().walk().reluctance();
-    double carReluctance = request.preferences().car().reluctance();
-    return (int) Math.round(
-      (walkToPickup + walkFromDropoff) * walkReluctance + drtDuration * carReluctance
-    );
   }
 
   /**
@@ -151,6 +136,10 @@ public class DecorateWithDRT implements ItineraryListFilter {
     List<Leg> allLegs,
     DemandResponsiveTransportationService service
   ) {
+    // Skip legs already decorated (e.g., access DRT from mapAccessLeg or direct DRT shift)
+    if (leg instanceof DRTLeg) {
+      return leg;
+    }
     if (leg instanceof StreetLeg sl && sl.getMode().isInCar()) {
       boolean isEgress = isEgressLeg(leg, allLegs);
       // For egress legs, use the leg's start time (actual transit arrival time)
@@ -211,7 +200,12 @@ public class DecorateWithDRT implements ItineraryListFilter {
         return leg;
       }
 
-      return new DRTLeg(sl, drtEstimationResponse);
+      int legCost = DRTLeg.computeGeneralizedCost(
+        drtEstimationResponse,
+        request.preferences().walk().reluctance(),
+        request.preferences().car().reluctance()
+      );
+      return new DRTLeg(sl, drtEstimationResponse, legCost);
     } else {
       return leg;
     }

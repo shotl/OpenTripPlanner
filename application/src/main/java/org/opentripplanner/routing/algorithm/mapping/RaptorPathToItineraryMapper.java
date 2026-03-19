@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.opentripplanner.astar.model.GraphPath;
+import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationAccessAdapter;
+import org.opentripplanner.ext.demandresponsivetransportation.model.DRTLeg;
 import org.opentripplanner.framework.application.OTPFeature;
 import org.opentripplanner.framework.geometry.GeometryUtils;
 import org.opentripplanner.framework.i18n.NonLocalizedString;
@@ -204,7 +206,47 @@ public class RaptorPathToItineraryMapper<T extends TripSchedule> {
 
     int fromTime = accessPathLeg.fromTime();
 
-    return subItinerary.withTimeShiftToStartAt(createZonedDateTime(fromTime)).getLegs();
+    var legs = subItinerary.withTimeShiftToStartAt(createZonedDateTime(fromTime)).getLegs();
+
+    // If the access was shifted by DRT, the Shotl response is stored in the adapter.
+    // Convert car StreetLegs to DRTLegs now so that leg-level cost and DRT estimate
+    // data are available before the filter chain runs.
+    var original = accessPathLeg.access().findOriginal(RoutingAccessEgress.class);
+    if (
+      original.isPresent() &&
+      original.get() instanceof DemandResponsiveTransportationAccessAdapter drtAdapter &&
+      drtAdapter.getShotlResponse() != null
+    ) {
+      legs = decorateAccessLegsWithDrt(legs, drtAdapter);
+    }
+
+    return legs;
+  }
+
+  /**
+   * Replace car {@link StreetLeg}s in the access path with {@link DRTLeg}s using the
+   * Shotl response stored in the DRT access adapter. This gives each leg the real
+   * pickup/dropoff times and a correctly computed generalized cost.
+   */
+  private static List<Leg> decorateAccessLegsWithDrt(
+    List<Leg> legs,
+    DemandResponsiveTransportationAccessAdapter drtAdapter
+  ) {
+    var response = drtAdapter.getShotlResponse();
+    double walkReluctance = drtAdapter.getWalkReluctance();
+    double carReluctance = drtAdapter.getCarReluctance();
+
+    int legCost = DRTLeg.computeGeneralizedCost(response, walkReluctance, carReluctance);
+
+    return legs
+      .stream()
+      .map(leg -> {
+        if (leg instanceof StreetLeg sl && sl.getMode().isInCar()) {
+          return new DRTLeg(sl, response, legCost);
+        }
+        return leg;
+      })
+      .toList();
   }
 
   private Leg mapTransitLeg(Leg prevTransitLeg, TransitPathLeg<T> pathLeg) {

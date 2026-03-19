@@ -18,4 +18,10 @@ public enum DrtRequestContext {
    * Request originates from the itinerary decoration phase (adding DRT estimates to legs).
    */
   LEG_DECORATING,
+
+  /**
+   * Request originates from the direct DRT itinerary shifting phase,
+   * where a door-to-door car itinerary is replaced with real DRT data before filtering.
+   */
+  DIRECT_SHIFTING,
 }

@@ -12,9 +12,14 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import javax.annotation.Nullable;
+import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationService;
+import org.opentripplanner.ext.demandresponsivetransportation.DrtRequestContext;
+import org.opentripplanner.ext.demandresponsivetransportation.model.DRTLeg;
 import org.opentripplanner.framework.application.OTPFeature;
 import org.opentripplanner.framework.application.OTPRequestTimeoutException;
 import org.opentripplanner.model.plan.Itinerary;
+import org.opentripplanner.model.plan.Leg;
+import org.opentripplanner.model.plan.StreetLeg;
 import org.opentripplanner.model.plan.grouppriority.TransitGroupPriorityItineraryDecorator;
 import org.opentripplanner.model.plan.paging.cursor.PageCursorInput;
 import org.opentripplanner.raptor.api.request.RaptorTuningParameters;
@@ -138,11 +143,12 @@ public class RoutingWorker {
     // Filter itineraries
     List<Itinerary> filteredItineraries;
     {
-      // Remove walk-only results when using direct flex or DRT modes since we expect
-      // actual flex/DRT service usage, not just walking
-      boolean removeWalkAllTheWayResultsFromDirectFlexOrDrt =
-        request.journey().direct().mode() == StreetMode.FLEXIBLE ||
-        request.journey().direct().mode() == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION;
+      // Remove walk-only results when using direct flex mode since we expect
+      // actual flex service usage, not just walking.
+      // DRT is excluded: the walk-only itinerary should compete naturally with DRT
+      // and transit results so the best solution (WALK, DRT, or both) is returned.
+      boolean removeWalkAllTheWayResultsFromDirectFlex =
+        request.journey().direct().mode() == StreetMode.FLEXIBLE;
 
       ItineraryListFilterChain filterChain = RouteRequestToFilterChainMapper.createFilterChain(
         request,
@@ -150,7 +156,7 @@ public class RoutingWorker {
         earliestDepartureTimeUsed(),
         searchWindowUsed(),
         emptyDirectModeHandler.removeWalkAllTheWayResults() ||
-        removeWalkAllTheWayResultsFromDirectFlexOrDrt,
+        removeWalkAllTheWayResultsFromDirectFlex,
         it -> pageCursorInput = it
       );
 
@@ -246,13 +252,144 @@ public class RoutingWorker {
 
     debugTimingAggregator.startedDirectStreetRouter();
     try {
-      itineraries.addAll(DirectStreetRouter.route(serverContext, request));
+      var directResults = DirectStreetRouter.route(serverContext, request);
+      // If direct mode is DRT, shift the itineraries with real DRT data (times, cost)
+      // BEFORE the filter chain runs, so cost-based filters see the real DRT cost.
+      if (request.journey().direct().mode() == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION) {
+        directResults = shiftDirectDrtItineraries(directResults);
+        // Also run a WALK direct search so the walk-only baseline enters the filter
+        // chain and prunes transit itineraries that are worse than just walking.
+        var savedMode = request.journey().direct().mode();
+        request.journey().direct().setMode(StreetMode.WALK);
+        try {
+          itineraries.addAll(DirectStreetRouter.route(serverContext, request));
+        } finally {
+          request.journey().direct().setMode(savedMode);
+        }
+      }
+      itineraries.addAll(directResults);
     } catch (RoutingValidationException e) {
       routingErrors.addAll(e.getRoutingErrors());
     } finally {
       debugTimingAggregator.finishedDirectStreetRouter();
     }
     return null;
+  }
+
+  /**
+   * For each direct DRT itinerary, call the DRT provider API to replace stale A*-based car
+   * times and costs with real DRT pickup/dropoff times and correctly computed generalized cost.
+   * This is analogous to what {@link DemandResponsiveTransportationAccessShifter} does for
+   * DRT access legs before Raptor.
+   * <p>
+   * Itineraries for which the DRT service returns no estimate are discarded.
+   */
+  private List<Itinerary> shiftDirectDrtItineraries(List<Itinerary> itineraries) {
+    var drtServices = serverContext.demandResponsiveTransportationServices();
+    if (drtServices == null || drtServices.isEmpty()) {
+      return itineraries;
+    }
+    if (request.demandResponsiveExtData() == null) {
+      return itineraries;
+    }
+
+    var service = drtServices.get(0);
+    double walkReluctance = request.preferences().walk().reluctance();
+    double carReluctance = request.preferences().car().reluctance();
+
+    var result = new ArrayList<Itinerary>();
+    for (var itinerary : itineraries) {
+      var shifted = shiftDirectDrtItinerary(itinerary, service, walkReluctance, carReluctance);
+      if (shifted != null) {
+        result.add(shifted);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Shift a single direct DRT itinerary by calling the DRT API for each car leg,
+   * replacing it with a {@link DRTLeg} that has real times and correct generalized cost.
+   *
+   * @return the updated itinerary, or {@code null} if DRT is not available for this trip.
+   */
+  @Nullable
+  private Itinerary shiftDirectDrtItinerary(
+    Itinerary itinerary,
+    DemandResponsiveTransportationService service,
+    double walkReluctance,
+    double carReluctance
+  ) {
+    var allLegs = itinerary.getLegs();
+    var updatedLegs = new ArrayList<Leg>(allLegs.size());
+    int costDelta = 0;
+
+    for (var leg : allLegs) {
+      if (leg instanceof StreetLeg sl && sl.getMode().isInCar()) {
+        var drtResponse = service.arrivalTimes(
+          request.demandResponsiveExtData().paxAppId(),
+          request.demandResponsiveExtData().areaId(),
+          request.demandResponsiveExtData().userId(),
+          request.demandResponsiveExtData().rideType(),
+          leg.getFrom().coordinate,
+          leg.getTo().coordinate,
+          request.demandResponsiveExtData().passengers().regular(),
+          request.demandResponsiveExtData().passengers().wheelchair(),
+          request.dateTime(),
+          DrtRequestContext.DIRECT_SHIFTING,
+          request.demandResponsiveExtData().passengerFareType(),
+          true
+        );
+
+        if (drtResponse == null) {
+          LOG.warn(
+            "No DRT estimate for direct leg ({},{}) → ({},{}), discarding itinerary",
+            leg.getFrom().coordinate.latitude(),
+            leg.getFrom().coordinate.longitude(),
+            leg.getTo().coordinate.latitude(),
+            leg.getTo().coordinate.longitude()
+          );
+          return null;
+        }
+
+        int legCost = DRTLeg.computeGeneralizedCost(drtResponse, walkReluctance, carReluctance);
+        costDelta += legCost - sl.getGeneralizedCost();
+        updatedLegs.add(new DRTLeg(sl, drtResponse, legCost));
+      } else {
+        updatedLegs.add(leg);
+      }
+    }
+
+    // Fix temporal overlaps: if the DRT leg times push into adjacent walk legs, shift them.
+    updatedLegs = fixTemporalOverlaps(updatedLegs);
+
+    // setLegs recalculates duration, walkDuration, etc. from the new leg times.
+    itinerary.setLegs(updatedLegs);
+
+    // Update the itinerary-level generalized cost with the delta between real DRT and A* car cost.
+    if (itinerary.getGeneralizedCost() != Itinerary.UNKNOWN && costDelta != 0) {
+      itinerary.setGeneralizedCost(itinerary.getGeneralizedCost() + costDelta);
+    }
+
+    return itinerary;
+  }
+
+  /**
+   * Shift non-transit legs forward when their start time is before the previous leg's end time,
+   * restoring a consistent timeline after DRT leg times are replaced.
+   */
+  private static ArrayList<Leg> fixTemporalOverlaps(ArrayList<Leg> legs) {
+    var result = new ArrayList<Leg>(legs.size());
+    ZonedDateTime previousEnd = null;
+    for (Leg leg : legs) {
+      if (previousEnd != null && !leg.isTransitLeg() && leg.getStartTime().isBefore(previousEnd)) {
+        Duration shift = Duration.between(leg.getStartTime(), previousEnd);
+        leg = leg.withTimeShift(shift);
+      }
+      result.add(leg);
+      previousEnd = leg.getEndTime();
+    }
+    return result;
   }
 
   private Void routeDirectFlex(

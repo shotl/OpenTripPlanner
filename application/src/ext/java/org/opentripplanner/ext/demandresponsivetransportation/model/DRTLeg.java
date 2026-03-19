@@ -15,7 +15,7 @@ public class DRTLeg extends StreetLeg {
 
   private final ShotlArrivalEstimateResponse estimate;
 
-  public DRTLeg(StreetLeg streetLeg, ShotlArrivalEstimateResponse estimate) {
+  public DRTLeg(StreetLeg streetLeg, ShotlArrivalEstimateResponse estimate, int generalizedCost) {
     super(
       StreetLegBuilder.of(streetLeg)
         .withStartTime(
@@ -28,8 +28,30 @@ public class DRTLeg extends StreetLeg {
             streetLeg.getEndTime().getZone()
           )
         )
+        .withGeneralizedCost(generalizedCost)
     );
     this.estimate = estimate;
+  }
+
+  /**
+   * Compute the generalized cost (in seconds) for a DRT leg, applying walk reluctance
+   * to walking portions and car reluctance to the DRT ride portion.
+   */
+  public static int computeGeneralizedCost(
+    ShotlArrivalEstimateResponse estimate,
+    double walkReluctance,
+    double carReluctance
+  ) {
+    long walkToPickup = estimate.pickup_walking_seconds() != null
+      ? estimate.pickup_walking_seconds()
+      : 0L;
+    long walkFromDropoff = estimate.dropoff_walking_seconds() != null
+      ? estimate.dropoff_walking_seconds()
+      : 0L;
+    long drtDuration = estimate.user_expected_dropoff_time() - estimate.user_expected_pickup_time();
+    return (int) Math.round(
+      (walkToPickup + walkFromDropoff) * walkReluctance + drtDuration * carReluctance
+    );
   }
 
   private DRTLeg(StreetLegBuilder builder, ShotlArrivalEstimateResponse estimate) {

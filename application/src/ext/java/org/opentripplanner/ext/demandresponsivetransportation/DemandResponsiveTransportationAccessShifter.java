@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.RoutingAccessEgress;
 import org.opentripplanner.routing.api.request.RouteRequest;
@@ -89,7 +90,8 @@ public class DemandResponsiveTransportationAccessShifter {
         shift.walkToPickupSeconds(),
         shift.walkFromDropoffSeconds(),
         preferences.walk().reluctance(),
-        preferences.car().reluctance()
+        preferences.car().reluctance(),
+        shift.shotlResponse()
       );
     } else {
       return null;
@@ -263,7 +265,8 @@ public class DemandResponsiveTransportationAccessShifter {
         pickupDelay,
         drtTravelDuration,
         walkToPickupSeconds,
-        walkFromDropoffSeconds
+        walkFromDropoffSeconds,
+        drtEstimationResponse
       )
     );
   }
@@ -288,7 +291,7 @@ public class DemandResponsiveTransportationAccessShifter {
         true
       );
     } else {
-      return Result.success(new DrtShiftResult(Duration.ZERO, Duration.ZERO, 0L, 0L));
+      return Result.success(new DrtShiftResult(Duration.ZERO, Duration.ZERO, 0L, 0L, null));
     }
   }
 
@@ -296,7 +299,8 @@ public class DemandResponsiveTransportationAccessShifter {
     Duration pickupDelay,
     Duration drtTravelDuration,
     long walkToPickupSeconds,
-    long walkFromDropoffSeconds
+    long walkFromDropoffSeconds,
+    ShotlArrivalEstimateResponse shotlResponse
   ) {}
 
   enum Error {
