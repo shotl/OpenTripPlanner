@@ -469,6 +469,8 @@ type DRTEstimate {
   userId: String!
   "Identifier for the vehicle assigned to the ride (nullable)."
   vehicleId: String
+  "Seconds the user waits at the pickup point for the DRT vehicle to arrive."
+  waitingSeconds: Int
 }
 
 """

@@ -41,7 +41,6 @@ import org.opentripplanner.apis.gtfs.model.StopOnTripModel;
 import org.opentripplanner.apis.gtfs.model.StopPosition;
 import org.opentripplanner.apis.gtfs.model.TripOccupancy;
 import org.opentripplanner.apis.gtfs.model.UnknownModel;
-import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.ext.fares.model.FareRuleSet;
 import org.opentripplanner.ext.ridehailing.model.RideEstimate;
 import org.opentripplanner.model.StopTimesInPattern;
@@ -405,6 +404,8 @@ public class GraphQLDataFetchers {
     public DataFetcher<String> userId();
 
     public DataFetcher<String> vehicleId();
+
+    public DataFetcher<Integer> waitingSeconds();
   }
 
   /**
@@ -581,7 +582,9 @@ public class GraphQLDataFetchers {
 
     public DataFetcher<GraphQLPickupDropoffType> dropoffType();
 
-    public DataFetcher<ShotlArrivalEstimateResponse> drtEstimate();
+    public DataFetcher<
+      org.opentripplanner.ext.demandresponsivetransportation.model.DRTLeg
+    > drtEstimate();
 
     public DataFetcher<Double> duration();
 

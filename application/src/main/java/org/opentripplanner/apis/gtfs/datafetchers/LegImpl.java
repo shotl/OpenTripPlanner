@@ -13,7 +13,6 @@ import org.opentripplanner.apis.gtfs.mapping.NumberMapper;
 import org.opentripplanner.apis.gtfs.mapping.PickDropMapper;
 import org.opentripplanner.apis.gtfs.mapping.RealtimeStateMapper;
 import org.opentripplanner.ext.demandresponsivetransportation.model.DRTLeg;
-import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.ext.restapi.mapping.LocalDateMapper;
 import org.opentripplanner.ext.ridehailing.model.RideEstimate;
 import org.opentripplanner.ext.ridehailing.model.RideHailingLeg;
@@ -220,11 +219,11 @@ public class LegImpl implements GraphQLDataFetchers.GraphQLLeg {
   }
 
   @Override
-  public DataFetcher<ShotlArrivalEstimateResponse> drtEstimate() {
+  public DataFetcher<DRTLeg> drtEstimate() {
     return environment -> {
       Leg leg = getSource(environment);
-      if (leg instanceof DRTLeg rhl) {
-        return rhl.rideEstimate();
+      if (leg instanceof DRTLeg drtLeg) {
+        return drtLeg;
       } else {
         return null;
       }

@@ -6,6 +6,7 @@ import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLNonNull;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLScalarType;
+import org.opentripplanner.ext.demandresponsivetransportation.model.DRTLeg;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 
 public class DRTEstimateType {
@@ -217,10 +218,21 @@ public class DRTEstimateType {
           .type(new GraphQLNonNull(PASSENGERS_TYPE))
           .dataFetcher(env -> source(env).passengers())
       )
+      .field(f ->
+        f
+          .name("waitingSeconds")
+          .description("Seconds the user waits at the pickup point for the DRT vehicle to arrive.")
+          .type(Scalars.GraphQLInt)
+          .dataFetcher(env -> (int) drtLeg(env).getWaitingSeconds())
+      )
       .build();
   }
 
   private static ShotlArrivalEstimateResponse source(graphql.schema.DataFetchingEnvironment env) {
+    return drtLeg(env).rideEstimate();
+  }
+
+  private static DRTLeg drtLeg(graphql.schema.DataFetchingEnvironment env) {
     return env.getSource();
   }
 }

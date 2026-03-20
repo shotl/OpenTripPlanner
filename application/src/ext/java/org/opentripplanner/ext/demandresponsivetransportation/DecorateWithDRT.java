@@ -64,24 +64,27 @@ public class DecorateWithDRT implements ItineraryListFilter {
         .toList();
 
       if (!i.isFlaggedForDeletion()) {
-        updateEgressGeneralizedCost(i, allLegs, decoratedLegs);
+        // Fix temporal overlaps first so we can compute the real waiting time
+        // from the consistent timeline.
+        var fixedLegs = fixTemporalOverlaps(decoratedLegs);
+        updateEgressGeneralizedCost(i, allLegs, fixedLegs);
+        i.setLegs(fixedLegs);
       }
-      i.setLegs(fixTemporalOverlaps(decoratedLegs));
     }
     return i;
   }
 
   /**
-   * Adjusts the itinerary's generalized cost to reflect the real DRT egress duration reported by
-   * the DRT provider, replacing the stale A* street-routing cost for each decorated egress leg.
-   * <p>
-   * The new cost uses the same formula as the access adapter:
-   * {@code (walkToPickup + walkFromDropoff) × walkReluctance + drtDuration × carReluctance}
+   * Adjusts the itinerary's generalized cost to reflect the real DRT egress reported by the DRT
+   * provider, replacing the stale A* street-routing cost for each decorated egress leg.
+   *
+   * @param originalLegs the legs before DRT decoration (used to identify egress legs and old cost)
+   * @param fixedLegs    the legs after DRT decoration and temporal overlap fixing
    */
   private void updateEgressGeneralizedCost(
     Itinerary itinerary,
     List<Leg> originalLegs,
-    List<Leg> decoratedLegs
+    List<Leg> fixedLegs
   ) {
     if (itinerary.getGeneralizedCost() == Itinerary.UNKNOWN) {
       return;
@@ -89,8 +92,8 @@ public class DecorateWithDRT implements ItineraryListFilter {
     int costDelta = 0;
     for (int idx = 0; idx < originalLegs.size(); idx++) {
       Leg original = originalLegs.get(idx);
-      Leg decorated = decoratedLegs.get(idx);
-      if (decorated instanceof DRTLeg drtLeg && isEgressLeg(original, originalLegs)) {
+      Leg fixed = fixedLegs.get(idx);
+      if (fixed instanceof DRTLeg drtLeg && isEgressLeg(original, originalLegs)) {
         int oldCost = original.getGeneralizedCost();
         int newCost = drtLeg.getGeneralizedCost();
         costDelta += newCost - oldCost;
@@ -102,17 +105,31 @@ public class DecorateWithDRT implements ItineraryListFilter {
   }
 
   /**
-   * After DRT decoration the leg times may change (e.g. DRT dropoff moves by a few seconds),
-   * leaving the immediately following non-transit leg starting before the previous one ends.
-   * This method shifts such legs forward to restore a consistent timeline.
+   * After DRT decoration the leg times may change, creating overlaps or gaps.
+   * <p>
+   * For <b>DRT legs</b>: only fix overlaps (shift forward). Gaps before a DRT leg represent
+   * real waiting time for the DRT vehicle and must be preserved — they are penalized in the
+   * generalized cost instead.
+   * <p>
+   * For <b>non-DRT non-transit legs</b> (walks): fix both overlaps and gaps so the timeline
+   * is seamless. In particular, the walk after a DRT leg should start immediately when the
+   * DRT leg ends (no stale gap from pre-decoration times).
    */
   private static List<Leg> fixTemporalOverlaps(List<Leg> legs) {
     var result = new ArrayList<Leg>(legs.size());
     ZonedDateTime previousEnd = null;
     for (Leg leg : legs) {
-      if (previousEnd != null && !leg.isTransitLeg() && leg.getStartTime().isBefore(previousEnd)) {
-        Duration shift = Duration.between(leg.getStartTime(), previousEnd);
-        leg = leg.withTimeShift(shift);
+      if (previousEnd != null && !leg.isTransitLeg()) {
+        boolean isDrt = leg instanceof DRTLeg;
+        boolean hasOverlap = leg.getStartTime().isBefore(previousEnd);
+        boolean hasGap = leg.getStartTime().isAfter(previousEnd);
+
+        // DRT legs: only fix overlaps (preserve gaps = waiting time)
+        // Non-DRT legs: fix both overlaps and gaps
+        if (hasOverlap || (hasGap && !isDrt)) {
+          Duration shift = Duration.between(leg.getStartTime(), previousEnd);
+          leg = leg.withTimeShift(shift);
+        }
       }
       result.add(leg);
       previousEnd = leg.getEndTime();
@@ -200,12 +217,28 @@ public class DecorateWithDRT implements ItineraryListFilter {
         return leg;
       }
 
-      int legCost = DRTLeg.computeGeneralizedCost(
-        drtEstimationResponse,
-        request.preferences().walk().reluctance(),
-        request.preferences().car().reluctance()
-      );
-      return new DRTLeg(sl, drtEstimationResponse, legCost);
+      if (isEgress) {
+        // For egress: the leg starts when the passenger arrives (from previous leg).
+        // Waiting = time between arriving at pickup point and vehicle arriving.
+        var legStartTime = leg.getStartTime();
+        long waitingSeconds = DRTLeg.computeWaitingSeconds(drtEstimationResponse, legStartTime);
+        int legCost = DRTLeg.computeGeneralizedCost(
+          drtEstimationResponse,
+          request.preferences().walk().reluctance(),
+          request.preferences().car().reluctance(),
+          waitingSeconds,
+          1.0 // waitReluctance, same as transit wait
+        );
+        return new DRTLeg(sl, drtEstimationResponse, legCost, legStartTime);
+      } else {
+        // For access: back-compute start time (zero waiting — handled by access shifting)
+        int legCost = DRTLeg.computeGeneralizedCost(
+          drtEstimationResponse,
+          request.preferences().walk().reluctance(),
+          request.preferences().car().reluctance()
+        );
+        return new DRTLeg(sl, drtEstimationResponse, legCost);
+      }
     } else {
       return leg;
     }

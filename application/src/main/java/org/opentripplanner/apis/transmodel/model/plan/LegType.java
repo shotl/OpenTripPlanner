@@ -416,7 +416,7 @@ public class LegType {
               l instanceof
               org.opentripplanner.ext.demandresponsivetransportation.model.DRTLeg drtLeg
             ) {
-              return drtLeg.rideEstimate();
+              return drtLeg;
             }
             return null;
           })

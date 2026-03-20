@@ -352,9 +352,19 @@ public class RoutingWorker {
           return null;
         }
 
-        int legCost = DRTLeg.computeGeneralizedCost(drtResponse, walkReluctance, carReluctance);
+        // For direct DRT, the user departs at request.dateTime(). Compute the waiting time
+        // between arriving at the pickup point and the vehicle picking up.
+        long waitingSeconds = DRTLeg.computeWaitingSeconds(drtResponse, request.dateTime());
+        int legCost = DRTLeg.computeGeneralizedCost(
+          drtResponse,
+          walkReluctance,
+          carReluctance,
+          waitingSeconds,
+          1.0 // waitReluctance, same as transit wait
+        );
+        var legStartTime = request.dateTime().atZone(sl.getStartTime().getZone());
         costDelta += legCost - sl.getGeneralizedCost();
-        updatedLegs.add(new DRTLeg(sl, drtResponse, legCost));
+        updatedLegs.add(new DRTLeg(sl, drtResponse, legCost, legStartTime));
       } else {
         updatedLegs.add(leg);
       }
@@ -375,16 +385,25 @@ public class RoutingWorker {
   }
 
   /**
-   * Shift non-transit legs forward when their start time is before the previous leg's end time,
-   * restoring a consistent timeline after DRT leg times are replaced.
+   * After DRT leg times are replaced, fix the timeline so non-DRT legs (walks) connect
+   * seamlessly with the DRT leg. DRT legs only have overlaps fixed; gaps before DRT legs
+   * represent waiting time and are preserved.
    */
   private static ArrayList<Leg> fixTemporalOverlaps(ArrayList<Leg> legs) {
     var result = new ArrayList<Leg>(legs.size());
     ZonedDateTime previousEnd = null;
     for (Leg leg : legs) {
-      if (previousEnd != null && !leg.isTransitLeg() && leg.getStartTime().isBefore(previousEnd)) {
-        Duration shift = Duration.between(leg.getStartTime(), previousEnd);
-        leg = leg.withTimeShift(shift);
+      if (previousEnd != null && !leg.isTransitLeg()) {
+        boolean isDrt = leg instanceof DRTLeg;
+        boolean hasOverlap = leg.getStartTime().isBefore(previousEnd);
+        boolean hasGap = leg.getStartTime().isAfter(previousEnd);
+
+        // DRT legs: only fix overlaps (preserve gaps = waiting time)
+        // Non-DRT legs: fix both overlaps and gaps
+        if (hasOverlap || (hasGap && !isDrt)) {
+          Duration shift = Duration.between(leg.getStartTime(), previousEnd);
+          leg = leg.withTimeShift(shift);
+        }
       }
       result.add(leg);
       previousEnd = leg.getEndTime();

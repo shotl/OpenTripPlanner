@@ -396,6 +396,13 @@ public class ItineraryListFilterChainBuilder {
   public ItineraryListFilterChain build() {
     List<ItineraryListFilter> filters = new ArrayList<>();
 
+    // Decorate DRT egress legs FIRST, before any cost-based filters, so that generalized
+    // cost, walking times, and itinerary start/end times reflect real DRT data.
+    // This ensures cost-based filters and sorting operate on correct values.
+    if (demandResponsiveTransportationDecorator != null) {
+      filters.add(demandResponsiveTransportationDecorator);
+    }
+
     filters.addAll(buildGroupByTripIdAndDistanceFilters());
 
     if (removeItinerariesWithSameRoutesAndStops) {
@@ -549,10 +556,8 @@ public class ItineraryListFilterChainBuilder {
         filters.add(rideHailingDecorator);
       }
 
-      if (demandResponsiveTransportationDecorator != null) {
-        filters.add(demandResponsiveTransportationDecorator);
-        addSort(filters, SortOrderComparator.comparator(sortOrder));
-      }
+      // DRT decoration is applied early (before cost-based filters) so that
+      // generalized cost and itinerary times are correct for filtering and sorting.
 
       if (stopConsolidationDecorator != null) {
         addDecorateFilter(filters, stopConsolidationDecorator);

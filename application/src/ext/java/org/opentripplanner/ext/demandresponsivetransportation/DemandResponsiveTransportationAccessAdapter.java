@@ -30,6 +30,7 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
   private final int drtDurationSeconds;
   private final int walkToPickupSeconds;
   private final int walkFromDropoffSeconds;
+  private final int waitingSeconds;
   private final double walkReluctance;
   private final double carReluctance;
 
@@ -42,17 +43,22 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
     Duration drtDuration,
     long walkToPickupSeconds,
     long walkFromDropoffSeconds,
+    long waitingSeconds,
     double walkReluctance,
     double carReluctance,
     @Nullable ShotlArrivalEstimateResponse shotlResponse
   ) {
     super(
       access.stop(),
-      (int) (walkToPickupSeconds + drtDuration.toSeconds() + walkFromDropoffSeconds),
+      (int) (walkToPickupSeconds +
+        waitingSeconds +
+        drtDuration.toSeconds() +
+        walkFromDropoffSeconds),
       computeGeneralizedCost(
         (int) walkToPickupSeconds,
         (int) drtDuration.toSeconds(),
         (int) walkFromDropoffSeconds,
+        (int) waitingSeconds,
         walkReluctance,
         carReluctance
       ),
@@ -63,6 +69,7 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
     this.drtDurationSeconds = (int) drtDuration.toSeconds();
     this.walkToPickupSeconds = (int) walkToPickupSeconds;
     this.walkFromDropoffSeconds = (int) walkFromDropoffSeconds;
+    this.waitingSeconds = (int) waitingSeconds;
     this.walkReluctance = walkReluctance;
     this.carReluctance = carReluctance;
     this.shotlResponse = shotlResponse;
@@ -77,6 +84,7 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
     this.drtDurationSeconds = other.drtDurationSeconds;
     this.walkToPickupSeconds = other.walkToPickupSeconds;
     this.walkFromDropoffSeconds = other.walkFromDropoffSeconds;
+    this.waitingSeconds = other.waitingSeconds;
     this.walkReluctance = other.walkReluctance;
     this.carReluctance = other.carReluctance;
     this.shotlResponse = other.shotlResponse;
@@ -101,6 +109,7 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
       this.drtDurationSeconds,
       this.walkToPickupSeconds,
       this.walkFromDropoffSeconds + additionalWalkSeconds,
+      this.waitingSeconds,
       this.walkReluctance,
       this.carReluctance,
       this.getLastState(),
@@ -114,6 +123,7 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
     int drtDurationSeconds,
     int walkToPickupSeconds,
     int walkFromDropoffSeconds,
+    int waitingSeconds,
     double walkReluctance,
     double carReluctance,
     org.opentripplanner.street.search.state.State lastState,
@@ -121,11 +131,12 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
   ) {
     super(
       stopIndex,
-      walkToPickupSeconds + drtDurationSeconds + walkFromDropoffSeconds,
+      walkToPickupSeconds + waitingSeconds + drtDurationSeconds + walkFromDropoffSeconds,
       computeGeneralizedCost(
         walkToPickupSeconds,
         drtDurationSeconds,
         walkFromDropoffSeconds,
+        waitingSeconds,
         walkReluctance,
         carReluctance
       ),
@@ -136,6 +147,7 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
     this.drtDurationSeconds = drtDurationSeconds;
     this.walkToPickupSeconds = walkToPickupSeconds;
     this.walkFromDropoffSeconds = walkFromDropoffSeconds;
+    this.waitingSeconds = waitingSeconds;
     this.walkReluctance = walkReluctance;
     this.carReluctance = carReluctance;
     this.shotlResponse = shotlResponse;
@@ -196,17 +208,20 @@ public final class DemandResponsiveTransportationAccessAdapter extends DefaultAc
 
   /**
    * Compute the generalized cost (in Raptor centi-seconds) for a DRT access/egress path,
-   * applying walk reluctance to walking portions and car reluctance to the DRT ride portion.
+   * applying walk reluctance to walking portions, car reluctance to the DRT ride portion,
+   * and a wait reluctance (1.0, same as transit wait) to the waiting time at the pickup point.
    */
   private static int computeGeneralizedCost(
     int walkToPickupSeconds,
     int drtDurationSeconds,
     int walkFromDropoffSeconds,
+    int waitingSeconds,
     double walkReluctance,
     double carReluctance
   ) {
     double walkCost = (walkToPickupSeconds + walkFromDropoffSeconds) * walkReluctance;
+    double waitCost = waitingSeconds * 1.0; // waitReluctance = 1.0, same as transit wait
     double drtCost = drtDurationSeconds * carReluctance;
-    return RaptorCostConverter.toRaptorCost(walkCost + drtCost);
+    return RaptorCostConverter.toRaptorCost(walkCost + waitCost + drtCost);
   }
 }

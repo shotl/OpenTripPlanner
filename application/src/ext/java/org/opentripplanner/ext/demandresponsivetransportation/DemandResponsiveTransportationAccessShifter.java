@@ -89,6 +89,7 @@ public class DemandResponsiveTransportationAccessShifter {
         shift.drtTravelDuration(),
         shift.walkToPickupSeconds(),
         shift.walkFromDropoffSeconds(),
+        shift.waitingSeconds(),
         preferences.walk().reluctance(),
         preferences.car().reluctance(),
         shift.shotlResponse()
@@ -260,12 +261,15 @@ public class DemandResponsiveTransportationAccessShifter {
       walkFromDropoffSeconds
     );
 
+    long waitingSeconds = Math.max(0, pickupDelay.toSeconds() - walkToPickupSeconds);
+
     return Result.success(
       new DrtShiftResult(
         pickupDelay,
         drtTravelDuration,
         walkToPickupSeconds,
         walkFromDropoffSeconds,
+        waitingSeconds,
         drtEstimationResponse
       )
     );
@@ -291,7 +295,7 @@ public class DemandResponsiveTransportationAccessShifter {
         true
       );
     } else {
-      return Result.success(new DrtShiftResult(Duration.ZERO, Duration.ZERO, 0L, 0L, null));
+      return Result.success(new DrtShiftResult(Duration.ZERO, Duration.ZERO, 0L, 0L, 0L, null));
     }
   }
 
@@ -300,6 +304,7 @@ public class DemandResponsiveTransportationAccessShifter {
     Duration drtTravelDuration,
     long walkToPickupSeconds,
     long walkFromDropoffSeconds,
+    long waitingSeconds,
     ShotlArrivalEstimateResponse shotlResponse
   ) {}
 
