@@ -245,10 +245,23 @@ public class DecorateWithDRT implements ItineraryListFilter {
   }
 
   /**
+   * Tolerance for the temporal feasibility check. The Shotl API often rounds
+   * {@code user_expected_pickup_time} down to the nearest minute, so the returned pickup
+   * time can be up to 60 seconds before the {@code desired_pickup_time} we sent.
+   * Additionally, per-request cache rounding (5-minute intervals) means a cached response
+   * may have been computed for a slightly earlier desired time. A 2-minute tolerance
+   * accommodates both effects without being so large that truly infeasible itineraries
+   * slip through.
+   */
+  private static final Duration EGRESS_TEMPORAL_TOLERANCE = Duration.ofMinutes(2);
+
+  /**
    * Checks whether the DRT estimate makes this itinerary temporally infeasible.
    * <p>
    * For access legs: the DRT must drop off the passenger before the first transit leg departs.
-   * For egress legs: the DRT must pick up the passenger after the last transit leg arrives.
+   * For egress legs: the DRT must pick up the passenger after the last transit leg arrives,
+   * with a tolerance to account for Shotl's time rounding to whole minutes and per-request
+   * cache key rounding.
    */
   private boolean isTemporallyInfeasible(
     Leg carLeg,
@@ -259,16 +272,19 @@ public class DecorateWithDRT implements ItineraryListFilter {
     if (isEgress) {
       // The passenger arrives at the car pickup point at carLeg.getStartTime(),
       // which already includes the walk time from the last transit stop.
-      // The DRT must not expect to pick up before the passenger is physically there.
+      // The DRT must not expect to pick up too far before the passenger is physically there.
+      // We allow a tolerance because Shotl rounds pickup times to whole minutes and
+      // the per-request cache may return a response computed for a slightly earlier time.
       var passengerAtPickup = carLeg.getStartTime().toInstant();
       var drtPickup = Instant.ofEpochSecond(drtResponse.user_expected_pickup_time());
-      if (drtPickup.isBefore(passengerAtPickup)) {
+      if (drtPickup.plus(EGRESS_TEMPORAL_TOLERANCE).isBefore(passengerAtPickup)) {
         LOG.warn(
           "Egress DRT temporally infeasible — flagging itinerary for deletion | " +
-          "DRT expectedPickup={} is before passenger arrives at pickup point={} | " +
+          "DRT expectedPickup={} is more than {}s before passenger arrives at pickup point={} | " +
           "egressLeg: ({},{}) → ({},{}) | " +
           "DRT expectedDropoff={}",
           formatInstant(drtPickup),
+          EGRESS_TEMPORAL_TOLERANCE.toSeconds(),
           formatInstant(passengerAtPickup),
           carLeg.getFrom().coordinate.latitude(),
           carLeg.getFrom().coordinate.longitude(),

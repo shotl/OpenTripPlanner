@@ -169,7 +169,10 @@ public final class AccessEgressPreferences implements Serializable {
       // CAR_RENTAL). This is not ideal, since we get an unfair comparison in the itinerary filters. We will
       // live with this for now, but might revisit it later.
       if (
-        it.includesDriving() && (it.accessAllowed() || it.egressAllowed()) && it != StreetMode.CAR
+        it.includesDriving() &&
+        (it.accessAllowed() || it.egressAllowed()) &&
+        it != StreetMode.CAR &&
+        it != StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION
       ) {
         penaltyBuilder.with(it, carPenalty);
       }
