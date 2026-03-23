@@ -7,6 +7,8 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import org.opentripplanner.ext.demandresponsivetransportation.model.DRTLeg;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.model.SystemNotice;
@@ -40,9 +42,16 @@ public class DecorateWithDRT implements ItineraryListFilter {
 
   @Override
   public List<Itinerary> filter(List<Itinerary> itineraries) {
+    ExecutorService io = DrtIoExecutor.getInstance();
     return drtServices
-      .parallelStream()
-      .flatMap(service -> itineraries.parallelStream().map(i -> addDRTInformation(i, service)))
+      .stream()
+      .flatMap(service -> {
+        var futures = itineraries
+          .stream()
+          .map(i -> CompletableFuture.supplyAsync(() -> addDRTInformation(i, service), io))
+          .toList();
+        return futures.stream().map(CompletableFuture::join);
+      })
       .toList();
   }
 
@@ -58,8 +67,11 @@ public class DecorateWithDRT implements ItineraryListFilter {
   private Itinerary addDRTInformation(Itinerary i, DemandResponsiveTransportationService service) {
     if (!i.isFlaggedForDeletion()) {
       var allLegs = i.getLegs();
+      // Legs are processed sequentially within an itinerary: typically 2-5 legs with
+      // only 1-2 car legs needing API calls. The real concurrency is at the itinerary
+      // level (above), so parallelizing legs would add thread pool overhead for no gain.
       var decoratedLegs = allLegs
-        .parallelStream()
+        .stream()
         .map(leg -> decorateLegWithRideEstimate(i, leg, allLegs, service))
         .toList();
 

@@ -4,7 +4,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.RoutingAccessEgress;
@@ -51,16 +52,22 @@ public class DemandResponsiveTransportationAccessShifter {
       return results;
     }
 
-    return results
-      .parallelStream()
-      .map(ae -> {
-        if (!ae.getLastState().containsModeCar()) {
-          return ae;
-        }
-        return shiftWithDrtTimes(ae, services, request, now, true);
-      })
-      .filter(Objects::nonNull)
-      .collect(Collectors.toList());
+    ExecutorService io = DrtIoExecutor.getInstance();
+    var futures = results
+      .stream()
+      .map(ae ->
+        CompletableFuture.supplyAsync(
+          () -> {
+            if (!ae.getLastState().containsModeCar()) {
+              return ae;
+            }
+            return shiftWithDrtTimes(ae, services, request, now, true);
+          },
+          io
+        )
+      )
+      .toList();
+    return futures.stream().map(CompletableFuture::join).filter(Objects::nonNull).toList();
   }
 
   private static RoutingAccessEgress shiftWithDrtTimes(

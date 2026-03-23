@@ -9,10 +9,13 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationService;
+import org.opentripplanner.ext.demandresponsivetransportation.DrtIoExecutor;
 import org.opentripplanner.ext.demandresponsivetransportation.DrtRequestContext;
 import org.opentripplanner.ext.demandresponsivetransportation.model.DRTLeg;
 import org.opentripplanner.framework.application.OTPFeature;
@@ -297,14 +300,17 @@ public class RoutingWorker {
     double walkReluctance = request.preferences().walk().reluctance();
     double carReluctance = request.preferences().car().reluctance();
 
-    var result = new ArrayList<Itinerary>();
-    for (var itinerary : itineraries) {
-      var shifted = shiftDirectDrtItinerary(itinerary, service, walkReluctance, carReluctance);
-      if (shifted != null) {
-        result.add(shifted);
-      }
-    }
-    return result;
+    ExecutorService io = DrtIoExecutor.getInstance();
+    var futures = itineraries
+      .stream()
+      .map(i ->
+        CompletableFuture.supplyAsync(
+          () -> shiftDirectDrtItinerary(i, service, walkReluctance, carReluctance),
+          io
+        )
+      )
+      .toList();
+    return futures.stream().map(CompletableFuture::join).filter(Objects::nonNull).toList();
   }
 
   /**
