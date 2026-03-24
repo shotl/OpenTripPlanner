@@ -7,6 +7,7 @@ import java.util.Locale;
 import javax.annotation.Nullable;
 import org.opentripplanner.astar.spi.TraverseVisitor;
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationService;
+import org.opentripplanner.ext.demandresponsivetransportation.JourneyAvailabilityService;
 import org.opentripplanner.ext.demandresponsivetransportation.PerRequestDemandResponsiveTransportationService;
 import org.opentripplanner.ext.emissions.EmissionsService;
 import org.opentripplanner.ext.flex.FlexParameters;
@@ -49,6 +50,7 @@ public class DefaultServerRequestContext implements OtpServerRequestContext {
   private final RealtimeVehicleService realtimeVehicleService;
   private final List<RideHailingService> rideHailingServices;
   private final List<DemandResponsiveTransportationService> demandResponsiveTransportationServices;
+  private final JourneyAvailabilityService journeyAvailabilityService;
   private final RouteRequest routeRequestDefaults;
   private final StreetLimitationParametersService streetLimitationParametersService;
   private final TransitRoutingConfig transitRoutingConfig;
@@ -97,6 +99,7 @@ public class DefaultServerRequestContext implements OtpServerRequestContext {
     RealtimeVehicleService realtimeVehicleService,
     List<RideHailingService> rideHailingServices,
     List<DemandResponsiveTransportationService> demandResponsiveTransportationServices,
+    @Nullable JourneyAvailabilityService journeyAvailabilityService,
     RouteRequest routeRequestDefaults,
     StreetLimitationParametersService streetLimitationParametersService,
     TransitRoutingConfig transitRoutingConfig,
@@ -128,6 +131,7 @@ public class DefaultServerRequestContext implements OtpServerRequestContext {
         )
       )
       .toList();
+    this.journeyAvailabilityService = journeyAvailabilityService;
     this.routeRequestDefaults = routeRequestDefaults;
     this.streetLimitationParametersService = streetLimitationParametersService;
     this.transitRoutingConfig = transitRoutingConfig;
@@ -227,6 +231,12 @@ public class DefaultServerRequestContext implements OtpServerRequestContext {
   @Override
   public List<DemandResponsiveTransportationService> demandResponsiveTransportationServices() {
     return demandResponsiveTransportationServices;
+  }
+
+  @Nullable
+  @Override
+  public JourneyAvailabilityService journeyAvailabilityService() {
+    return journeyAvailabilityService;
   }
 
   @Nullable

@@ -97,6 +97,7 @@ public class TestServerContext {
       createRealtimeVehicleService(transitService),
       List.of(),
       List.of(),
+      null,
       request,
       createStreetLimitationParametersService(),
       routerConfig.transitTuningConfig(),

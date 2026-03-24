@@ -4,8 +4,11 @@ import dagger.Module;
 import dagger.Provides;
 import jakarta.inject.Singleton;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationService;
+import org.opentripplanner.ext.demandresponsivetransportation.JourneyAvailabilityService;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlService;
+import org.opentripplanner.ext.demandresponsivetransportation.service.shotlareas.ShotlAreasService;
 import org.opentripplanner.framework.io.OtpHttpClient;
 import org.opentripplanner.framework.io.OtpHttpClientFactory;
 import org.opentripplanner.standalone.config.RouterConfig;
@@ -41,15 +44,38 @@ public class DemandResponsiveTransportationServicesModule {
   @Singleton
   @SuppressWarnings("resource") // Factory is kept alive by the shared httpClient for app lifetime
   List<DemandResponsiveTransportationService> services(RouterConfig config) {
-    var sharedHttpClient = new OtpHttpClientFactory(
-      DRT_MAX_TOTAL_CONNECTIONS,
-      DRT_MAX_CONN_PER_ROUTE
-    ).create(LOG);
+    var sharedHttpClient = createSharedHttpClient();
 
     return config
       .demandResponsiveTransportationServiceParameters()
       .stream()
       .map(p -> (DemandResponsiveTransportationService) new ShotlService(p, sharedHttpClient))
       .toList();
+  }
+
+  @Provides
+  @Singleton
+  @Nullable
+  @SuppressWarnings("resource")
+  JourneyAvailabilityService journeyAvailabilityService(RouterConfig config) {
+    var params = config.demandResponsiveTransportationServiceParameters();
+    if (params.isEmpty()) {
+      return null;
+    }
+
+    // Use the first configured service's areasURL (same pattern as services.get(0) elsewhere)
+    var firstParam = params.get(0);
+    if (firstParam.areasURL() == null || firstParam.areasURL().isBlank()) {
+      LOG.info("[DRT] No areasURL configured — journey availability pre-filtering is disabled");
+      return null;
+    }
+
+    var httpClient = createSharedHttpClient();
+    LOG.info("[DRT] Journey availability service enabled | areasURL={}", firstParam.areasURL());
+    return new ShotlAreasService(firstParam.areasURL(), httpClient);
+  }
+
+  private OtpHttpClient createSharedHttpClient() {
+    return new OtpHttpClientFactory(DRT_MAX_TOTAL_CONNECTIONS, DRT_MAX_CONN_PER_ROUTE).create(LOG);
   }
 }

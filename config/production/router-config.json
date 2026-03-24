@@ -4,6 +4,7 @@
             "type": "shotl-demand-responsive-transportation",
             "enabled": true,
             "estimationsURL": "http://rides-api.shotl.svc.cluster.local/",
+            "areasURL": "http://areas-api.shotl.svc.cluster.local/",
             "providerName": "Shotl"
         }
     ],

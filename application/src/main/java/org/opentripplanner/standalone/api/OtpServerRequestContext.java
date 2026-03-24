@@ -8,6 +8,7 @@ import javax.annotation.Nullable;
 import org.opentripplanner.astar.spi.TraverseVisitor;
 import org.opentripplanner.ext.dataoverlay.routing.DataOverlayContext;
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationService;
+import org.opentripplanner.ext.demandresponsivetransportation.JourneyAvailabilityService;
 import org.opentripplanner.ext.emissions.EmissionsService;
 import org.opentripplanner.ext.flex.FlexParameters;
 import org.opentripplanner.ext.geocoder.LuceneIndex;
@@ -111,6 +112,9 @@ public interface OtpServerRequestContext {
   List<RideHailingService> rideHailingServices();
 
   List<DemandResponsiveTransportationService> demandResponsiveTransportationServices();
+
+  @Nullable
+  JourneyAvailabilityService journeyAvailabilityService();
 
   StreetLimitationParametersService streetLimitationParametersService();
 

@@ -119,6 +119,7 @@ public class SpeedTest {
       TestServerContext.createRealtimeVehicleService(transitService),
       List.of(),
       List.of(),
+      null,
       config.request,
       TestServerContext.createStreetLimitationParametersService(),
       config.transitRoutingParams,

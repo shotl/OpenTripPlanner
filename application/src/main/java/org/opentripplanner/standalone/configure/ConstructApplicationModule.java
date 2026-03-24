@@ -8,6 +8,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.opentripplanner.astar.spi.TraverseVisitor;
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationService;
+import org.opentripplanner.ext.demandresponsivetransportation.JourneyAvailabilityService;
 import org.opentripplanner.ext.emissions.EmissionsService;
 import org.opentripplanner.ext.geocoder.LuceneIndex;
 import org.opentripplanner.ext.interactivelauncher.api.LauncherRequestDecorator;
@@ -46,6 +47,7 @@ public class ConstructApplicationModule {
     VehicleParkingService vehicleParkingService,
     List<RideHailingService> rideHailingServices,
     List<DemandResponsiveTransportationService> demandResponsiveTransportationServices,
+    @Nullable JourneyAvailabilityService journeyAvailabilityService,
     ViaCoordinateTransferFactory viaTransferResolver,
     @Nullable StopConsolidationService stopConsolidationService,
     StreetLimitationParametersService streetLimitationParametersService,
@@ -71,6 +73,7 @@ public class ConstructApplicationModule {
       realtimeVehicleService,
       rideHailingServices,
       demandResponsiveTransportationServices,
+      journeyAvailabilityService,
       defaultRequest,
       streetLimitationParametersService,
       transitRoutingConfig,

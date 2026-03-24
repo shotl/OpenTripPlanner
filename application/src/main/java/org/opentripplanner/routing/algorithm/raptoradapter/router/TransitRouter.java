@@ -16,6 +16,7 @@ import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationAccessAdapter;
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationAccessShifter;
+import org.opentripplanner.ext.demandresponsivetransportation.JourneyAvailabilityFilter;
 import org.opentripplanner.ext.ridehailing.RideHailingAccessShifter;
 import org.opentripplanner.framework.application.OTPFeature;
 import org.opentripplanner.framework.model.TimeAndCost;
@@ -338,6 +339,12 @@ public class TransitRouter {
     // Walk-accessible stops are added separately below and are NOT filtered.
     if (mode == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION) {
       nearbyStops = filterDrtEligibleStops(nearbyStops, type);
+
+      // Pre-filter by journey availability: call the areas service to check
+      // which origin->stop (access) or stop->destination (egress) journeys
+      // can actually be served by the DRT provider. This avoids expensive
+      // Shotl rides API calls and unnecessary Raptor paths for infeasible journeys.
+      nearbyStops = filterByJourneyAvailability(nearbyStops, type);
     }
 
     var accessEgresses = AccessEgressMapper.mapNearbyStops(nearbyStops, type);
@@ -578,6 +585,33 @@ public class TransitRouter {
       eligibleButNotNearby
     );
     return filtered;
+  }
+
+  /**
+   * Filter nearby stops by calling the journey-availability service to check whether
+   * each origin-to-stop (access) or stop-to-destination (egress) journey can actually
+   * be served by the DRT provider. This avoids expensive Shotl rides API calls and
+   * unnecessary Raptor paths for journeys that the DRT provider cannot serve.
+   * <p>
+   * Uses fail-open behavior: if the service is not configured or unavailable, all stops
+   * pass through unfiltered.
+   */
+  private Collection<NearbyStop> filterByJourneyAvailability(
+    Collection<NearbyStop> nearbyStops,
+    AccessEgressType type
+  ) {
+    var availabilityService = serverContext.journeyAvailabilityService();
+    if (availabilityService == null) {
+      return nearbyStops;
+    }
+
+    var drtData = request.demandResponsiveExtData();
+    if (drtData == null || drtData.areaId() == null) {
+      return nearbyStops;
+    }
+
+    var filter = new JourneyAvailabilityFilter(availabilityService);
+    return filter.filter(nearbyStops, type, drtData.areaId(), request.dateTime());
   }
 
   /**

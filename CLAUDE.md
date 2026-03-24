@@ -1056,6 +1056,7 @@ Phase 2 - Access Shifting:
 | `ext/demandresponsivetransportation/service/shotl/ShotlTimeEstimateRequest.java` | Shotl API request record |
 | `ext/demandresponsivetransportation/service/shotl/ShotlApiResponse.java` | Raw Shotl API response wrapper |
 | `ext/demandresponsivetransportation/service/shotl/ShotlBusinessRejectionException.java` | Exception for Shotl business rejections |
+| `ext/demandresponsivetransportation/DrtIoExecutor.java` | Shared I/O thread pool (20 threads) for concurrent Shotl API calls |
 | `ext/demandresponsivetransportation/DrtEstimateRequest.java` | Cache key (rounded coords + time) |
 | `ext/demandresponsivetransportation/DrtRequestContext.java` | Enum: ACCESS_SHIFTING, EGRESS_SHIFTING, LEG_DECORATING, DIRECT_SHIFTING |
 | `ext/demandresponsivetransportation/DrtStopsModule.java` | Graph build: loads drt_stops.txt |
@@ -1282,17 +1283,19 @@ Savings: 3 API calls (75% reduction per station)
 
 This is especially impactful for large stations (e.g., train stations with 8-12 platforms).
 
-#### Parallel Stream Execution
+#### Dedicated I/O Thread Pool (DrtIoExecutor)
 
-Three levels of parallelism are used:
+DRT API calls are I/O-bound (threads block waiting for HTTP responses), so `parallelStream()` — which sizes its pool to CPU core count via `ForkJoinPool` — was the wrong tool. On a single-core machine, `parallelStream()` runs everything sequentially, even though the CPU is idle while waiting for responses.
+
+`DrtIoExecutor` provides a shared fixed thread pool of **20 daemon threads** (matching `DRT_MAX_CONN_PER_ROUTE`) using `CompletableFuture.supplyAsync(..., io)`. This ensures concurrent Shotl API calls regardless of CPU core count.
 
 | Phase | Parallelism Strategy | Details |
 |-------|---------------------|---------|
 | **Top-level routing** | `CompletableFuture.allOf()` | Direct, Flex, and Transit routing run concurrently |
 | **Access/egress fetch** | `CompletableFuture.allOf()` | Access and egress computed in parallel |
-| **Access shifting** | `parallelStream()` | All access entries shifted concurrently |
-| **Leg decoration** | Nested `parallelStream()` | Services × itineraries × legs — all parallel |
-| **Direct DRT shifting** | Sequential `for` loop | **Not parallelized** (see improvement 20.3.2) |
+| **Access shifting** | `CompletableFuture` + `DrtIoExecutor` | All access entries shifted concurrently on I/O pool |
+| **Leg decoration** | `CompletableFuture` + `DrtIoExecutor` | Itineraries decorated concurrently; legs sequential within each itinerary (only 1-2 car legs) |
+| **Direct DRT shifting** | `CompletableFuture` + `DrtIoExecutor` | All direct itineraries shifted concurrently on I/O pool |
 
 #### Skip Already-Decorated Legs
 
@@ -1338,25 +1341,9 @@ Impact: Worst-case latency drops from 60s to 10-15s per phase
 Risk: Some valid but slow Shotl responses get dropped (fallback: no DRT offered)
 ```
 
-#### 20.4.2 Direct DRT Shifting Is Sequential (Medium Impact, Low Effort)
+#### 20.4.2 Direct DRT Shifting Is Sequential — IMPLEMENTED
 
-**Current**: `RoutingWorker.shiftDirectDrtItineraries()` processes itineraries in a sequential `for` loop (line 301). Within each itinerary, legs are also processed sequentially (line 327). This means N direct itineraries with M car legs each = N*M sequential API calls.
-
-**Suggestion**: Use `parallelStream()` like the other phases:
-
-```java
-// Current (sequential):
-for (var itinerary : itineraries) {
-    var shifted = shiftDirectDrtItinerary(itinerary, service, ...);
-    if (shifted != null) result.add(shifted);
-}
-
-// Improved (parallel):
-return itineraries.parallelStream()
-    .map(i -> shiftDirectDrtItinerary(i, service, ...))
-    .filter(Objects::nonNull)
-    .toList();
-```
+**Implemented**: `RoutingWorker.shiftDirectDrtItineraries()` now uses `CompletableFuture.supplyAsync()` with the shared `DrtIoExecutor` thread pool to shift all direct itineraries concurrently, instead of the previous sequential `for` loop.
 
 #### 20.4.3 No Cross-Request Caching (Medium Impact, Medium Effort)
 
@@ -1376,33 +1363,9 @@ Mitigation: Use cross-request cache only for timing/cost estimation,
 
 One concern is that Shotl estimates contain an `id` field that may be used for booking. If the cached `id` is reused for a different user's booking, it could cause issues. The cross-request cache should either strip the `id` field or only cache the timing/duration data, not the full response.
 
-#### 20.4.4 Nested parallelStream() Can Oversubscribe the ForkJoinPool (Medium Impact, Medium Effort)
+#### 20.4.4 Nested parallelStream() Can Oversubscribe the ForkJoinPool — IMPLEMENTED
 
-**Current**: `DecorateWithDRT.filter()` uses nested `parallelStream()`:
-
-```java
-drtServices.parallelStream()
-    .flatMap(service -> itineraries.parallelStream()
-        .map(i -> addDRTInformation(i, service)))
-```
-
-And inside `addDRTInformation`, legs are *also* processed with `parallelStream()`:
-
-```java
-allLegs.parallelStream()
-    .map(leg -> decorateLegWithRideEstimate(...))
-```
-
-This is three levels of nested parallelism all sharing the common `ForkJoinPool`. With 1 service, 5 itineraries, and 2 car legs each, this spawns up to 10 concurrent Shotl HTTP calls — fine. But the ForkJoinPool's default parallelism is `Runtime.availableProcessors()` (typically 4-16 threads), so the actual parallelism is bounded by thread count, not task count. The inner `parallelStream()` over legs (usually 2-5 legs) creates overhead from fork-join task scheduling for a negligible benefit.
-
-**Suggestion**: Remove the innermost `parallelStream()` on legs and use a regular stream. With typically 2-5 legs per itinerary (and only 1-2 being car legs), the fork-join overhead exceeds the parallelism benefit. Keep the outer parallelism (over itineraries) which provides the real concurrency benefit.
-
-```java
-// Replace inner parallelStream with sequential stream
-var decoratedLegs = allLegs.stream()  // was: parallelStream()
-    .map(leg -> decorateLegWithRideEstimate(i, leg, allLegs, service))
-    .toList();
-```
+**Implemented**: All three `parallelStream()` levels in `DecorateWithDRT` and the `parallelStream()` in `DemandResponsiveTransportationAccessShifter` have been replaced with `CompletableFuture.supplyAsync()` using the shared `DrtIoExecutor` thread pool (20 I/O threads). The innermost `parallelStream()` on legs was replaced with a sequential `stream()` since itineraries typically have only 1-2 car legs. This eliminates the `ForkJoinPool` bottleneck that caused all Shotl API calls to run sequentially on single-core deployments.
 
 #### 20.4.5 Shotl API Batch Endpoint (High Impact, High Effort)
 
@@ -1464,13 +1427,14 @@ With 20+ API calls per request and 100+ concurrent users, this produces thousand
 | Connection pooling (40/20) | Implemented | 0 (enables parallelism) | Prevents serialization bottleneck |
 | Per-request cache (10m, 5min rounding) | Implemented | ~10-20% per request | Avoids near-duplicate calls |
 | Sibling stop expansion | Implemented | 50-75% per multi-platform station | Significant for train stations |
+| Dedicated I/O thread pool (DrtIoExecutor) | Implemented | 0 (enables true parallelism) | Concurrent Shotl calls regardless of CPU cores; fixes single-core sequential bottleneck |
 | Parallel access shifting | Implemented | 0 (enables parallelism) | Shifts from N*latency to max(latency) |
 | Parallel leg decoration | Implemented | 0 (enables parallelism) | Shifts from N*latency to max(latency) |
+| Parallel direct DRT shifting | Implemented | 0 (enables parallelism) | Was sequential, now concurrent on I/O pool |
+| Sequential legs within itinerary | Implemented | 0 (removes overhead) | Eliminates ForkJoinPool overhead for 1-2 car legs |
 | Skip decorated legs | Implemented | ~30-50% of decoration calls | Avoids re-decorating access legs |
 | **Reduce timeout to 10-15s** | **Not implemented** | 0 | **Worst case 60s -> 10-15s** |
-| **Parallelize direct DRT** | **Not implemented** | 0 | **Sequential -> parallel** |
 | **Cross-request cache** | **Not implemented** | **50-80% for popular routes** | **Major reduction for repeat queries** |
-| **Remove inner parallelStream** | **Not implemented** | 0 | **Reduces ForkJoinPool contention** |
 | **Batch Shotl API endpoint** | **Not implemented** | **Collapses N calls to 1** | **Eliminates HTTP round-trip overhead** |
 | **Pre-filter distant stops** | **Not implemented** | **20-50% of access calls** | **Fewer wasted API calls** |
 | **Move logging to DEBUG** | **Not implemented** | 0 | **Reduces I/O contention under load** |
