@@ -174,7 +174,7 @@ public class StreetNearbyStopFinder implements NearbyStopFinder {
             stopsFound.add(NearbyStop.nearbyStopForState(state, tsv.getStop()));
           } else {
             if (streetRequest.mode() == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION) {
-              LOG.info(
+              LOG.debug(
                 "[DRT] Street search reached stop {} but state is NOT final — carPickupState={}, currentMode={}, containsCar={}",
                 tsv.getStop().getId(),
                 state.getCarPickupState(),
@@ -182,12 +182,6 @@ public class StreetNearbyStopFinder implements NearbyStopFinder {
                 state.containsModeCar()
               );
             }
-            // LOG.debug(
-            //   "[DRT-DEBUG] Transit stop NOT final: stop={}, carPickupState={}, currentMode={}",
-            //   tsv.getStop(),
-            //   state.getCarPickupState(),
-            //   state.currentMode()
-            // );
           }
         }
         if (

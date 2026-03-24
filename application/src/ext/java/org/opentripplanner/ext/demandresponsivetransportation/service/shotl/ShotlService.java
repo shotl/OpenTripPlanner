@@ -120,7 +120,7 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
     // Convert request to JsonNode
     var jsonBody = MAPPER.valueToTree(request);
 
-    LOG.info(
+    LOG.debug(
       "[DRT] API REQUEST | context={} | url={} | areaId={} | userId={} | rideType={} | " +
       "from=({},{}) | to=({},{}) | passengers=(regular={}, wheelchair={}) | pickupTime={}",
       context,
@@ -184,7 +184,7 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
     }
 
     var data = apiResponse.data();
-    LOG.info(
+    LOG.debug(
       "[DRT] API SUCCESS | context={} | areaId={} | id={} | desiredPickupLocation=({},{}) | " +
       "desiredDropoffLocation=({},{}) | scheduledPickupPlace={} | scheduledDropoffPlace={} | " +
       "desiredPickupTime={} | desiredDropoffTime={} | userExpectedPickupTime={} | " +

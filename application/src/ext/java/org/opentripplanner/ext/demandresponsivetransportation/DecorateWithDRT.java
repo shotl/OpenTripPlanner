@@ -6,11 +6,15 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import org.opentripplanner.ext.demandresponsivetransportation.model.DRTLeg;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
+import org.opentripplanner.framework.geometry.WgsCoordinate;
 import org.opentripplanner.model.SystemNotice;
 import org.opentripplanner.model.plan.Itinerary;
 import org.opentripplanner.model.plan.Leg;
@@ -23,6 +27,13 @@ import org.slf4j.LoggerFactory;
 /**
  * This filter decorates car dropoff/pickup legs with information from DRT services and
  * adds information about the price and arrival time of the vehicle.
+ * <p>
+ * Before making any API calls, all car legs across all itineraries are scanned and
+ * deduplicated by their rounded cache key (coordinates ~10m, pickup time ~5min).
+ * Only unique estimates are fetched concurrently, then the responses are distributed
+ * back to all legs that share the same key. This eliminates duplicate API calls that
+ * previously occurred when multiple itineraries had egress legs to the same stop at
+ * similar times.
  */
 public class DecorateWithDRT implements ItineraryListFilter {
 
@@ -31,6 +42,12 @@ public class DecorateWithDRT implements ItineraryListFilter {
   public static final String NO_DRT_AVAILABLE = "no-drt-available";
   private final List<DemandResponsiveTransportationService> drtServices;
   private final RouteRequest request;
+
+  /**
+   * Original (non-rounded) parameters for a DRT estimate API call.
+   * One instance is kept per unique {@link DrtEstimateRequest} cache key.
+   */
+  private record FetchParams(WgsCoordinate from, WgsCoordinate to, Instant pickupTime) {}
 
   public DecorateWithDRT(
     List<DemandResponsiveTransportationService> drtServices,
@@ -42,17 +59,210 @@ public class DecorateWithDRT implements ItineraryListFilter {
 
   @Override
   public List<Itinerary> filter(List<Itinerary> itineraries) {
-    ExecutorService io = DrtIoExecutor.getInstance();
     return drtServices
       .stream()
-      .flatMap(service -> {
-        var futures = itineraries
-          .stream()
-          .map(i -> CompletableFuture.supplyAsync(() -> addDRTInformation(i, service), io))
-          .toList();
-        return futures.stream().map(CompletableFuture::join);
-      })
+      .flatMap(service -> decorateWithDeduplication(itineraries, service).stream())
       .toList();
+  }
+
+  /**
+   * Three-phase decoration: collect unique requests, fetch concurrently, apply results.
+   * <p>
+   * Deduplication uses exact coordinates and pickup times (no rounding). Two legs that
+   * map to the exact same API call parameters share one fetch. The per-request cache
+   * (which uses rounded keys) still sits in the call chain for access shifting, but
+   * decoration no longer depends on it.
+   */
+  private List<Itinerary> decorateWithDeduplication(
+    List<Itinerary> itineraries,
+    DemandResponsiveTransportationService service
+  ) {
+    // Phase 1: Collect unique DRT estimate requests across all itineraries
+    var uniqueRequests = new LinkedHashMap<FetchParams, FetchParams>();
+    var extData = request.demandResponsiveExtData();
+    int totalCarLegs = 0;
+
+    for (var itinerary : itineraries) {
+      if (itinerary.isFlaggedForDeletion()) continue;
+      for (var leg : itinerary.getLegs()) {
+        if (leg instanceof DRTLeg) continue;
+        if (leg instanceof StreetLeg sl && sl.getMode().isInCar()) {
+          totalCarLegs++;
+          boolean isEgress = isEgressLeg(leg, itinerary.getLegs());
+          var pickupTime = isEgress ? leg.getStartTime().toInstant() : request.dateTime();
+          var key = new FetchParams(leg.getFrom().coordinate, leg.getTo().coordinate, pickupTime);
+          uniqueRequests.putIfAbsent(key, key);
+        }
+      }
+    }
+
+    if (uniqueRequests.isEmpty()) {
+      return itineraries;
+    }
+
+    LOG.info(
+      "[DRT] decoration | totalCarLegs={} | uniqueEstimates={}",
+      totalCarLegs,
+      uniqueRequests.size()
+    );
+
+    // Phase 2: Fetch unique estimates concurrently on the I/O thread pool
+    ExecutorService io = DrtIoExecutor.getInstance();
+    var futures = new LinkedHashMap<FetchParams, CompletableFuture<ShotlArrivalEstimateResponse>>();
+    for (var params : uniqueRequests.keySet()) {
+      futures.put(
+        params,
+        CompletableFuture.supplyAsync(
+          () ->
+            service.arrivalTimes(
+              extData.paxAppId(),
+              extData.areaId(),
+              extData.userId(),
+              extData.rideType(),
+              params.from(),
+              params.to(),
+              extData.passengers().regular(),
+              extData.passengers().wheelchair(),
+              params.pickupTime(),
+              DrtRequestContext.LEG_DECORATING,
+              extData.passengerFareType(),
+              true
+            ),
+          io
+        )
+      );
+    }
+
+    var estimates = new HashMap<FetchParams, ShotlArrivalEstimateResponse>();
+    for (var entry : futures.entrySet()) {
+      var params = entry.getKey();
+      var response = entry.getValue().join();
+      estimates.put(params, response);
+      if (response != null) {
+        long walkToPickup = response.pickup_walking_seconds() != null
+          ? response.pickup_walking_seconds()
+          : 0L;
+        long walkFromDropoff = response.dropoff_walking_seconds() != null
+          ? response.dropoff_walking_seconds()
+          : 0L;
+        LOG.info(
+          "[DRT] decoration estimate | from=({},{}) → ({},{}) | pickupTime={} | expectedPickup={} | expectedDropoff={} | walkToPickup={}s | walkFromDropoff={}s",
+          params.from().latitude(),
+          params.from().longitude(),
+          params.to().latitude(),
+          params.to().longitude(),
+          params.pickupTime(),
+          response.user_expected_pickup_time(),
+          response.user_expected_dropoff_time(),
+          walkToPickup,
+          walkFromDropoff
+        );
+      }
+    }
+
+    // Phase 3: Apply fetched estimates to each itinerary (CPU-only, no I/O)
+    return itineraries.stream().map(i -> applyEstimates(i, estimates)).toList();
+  }
+
+  private Itinerary applyEstimates(
+    Itinerary i,
+    Map<FetchParams, ShotlArrivalEstimateResponse> estimates
+  ) {
+    if (i.isFlaggedForDeletion()) {
+      return i;
+    }
+
+    var allLegs = i.getLegs();
+    var decoratedLegs = allLegs
+      .stream()
+      .map(leg -> decorateLegFromEstimates(i, leg, allLegs, estimates))
+      .toList();
+
+    if (!i.isFlaggedForDeletion()) {
+      var fixedLegs = fixTemporalOverlaps(decoratedLegs);
+      updateEgressGeneralizedCost(i, allLegs, fixedLegs);
+      i.setLegs(fixedLegs);
+    }
+
+    return i;
+  }
+
+  private Leg decorateLegFromEstimates(
+    Itinerary i,
+    Leg leg,
+    List<Leg> allLegs,
+    Map<FetchParams, ShotlArrivalEstimateResponse> estimates
+  ) {
+    if (leg instanceof DRTLeg) {
+      return leg;
+    }
+    if (!(leg instanceof StreetLeg sl) || !sl.getMode().isInCar()) {
+      return leg;
+    }
+
+    boolean isEgress = isEgressLeg(leg, allLegs);
+    var pickupTime = isEgress ? leg.getStartTime().toInstant() : request.dateTime();
+    var key = new FetchParams(leg.getFrom().coordinate, leg.getTo().coordinate, pickupTime);
+
+    var drtEstimationResponse = estimates.get(key);
+
+    if (drtEstimationResponse == null) {
+      LOG.warn(
+        "[DRT] No estimate available for {} leg from ({},{}) to ({},{}) at {} — flagging itinerary for deletion",
+        isEgress ? "egress" : "access",
+        leg.getFrom().coordinate.latitude(),
+        leg.getFrom().coordinate.longitude(),
+        leg.getTo().coordinate.latitude(),
+        leg.getTo().coordinate.longitude(),
+        pickupTime
+      );
+      flagForDeletion(i);
+      return leg;
+    }
+
+    if (isTemporallyInfeasible(leg, allLegs, drtEstimationResponse, isEgress)) {
+      flagForDeletion(i);
+      return leg;
+    }
+
+    var legType = isEgress ? "egress" : "access";
+    long waitingSeconds;
+    int legCost;
+    DRTLeg drtLeg;
+    if (isEgress) {
+      var legStartTime = leg.getStartTime();
+      waitingSeconds = DRTLeg.computeWaitingSeconds(drtEstimationResponse, legStartTime);
+      legCost = DRTLeg.computeGeneralizedCost(
+        drtEstimationResponse,
+        request.preferences().walk().reluctance(),
+        request.preferences().car().reluctance(),
+        waitingSeconds,
+        1.0 // waitReluctance, same as transit wait
+      );
+      drtLeg = new DRTLeg(sl, drtEstimationResponse, legCost, legStartTime);
+    } else {
+      waitingSeconds = 0;
+      legCost = DRTLeg.computeGeneralizedCost(
+        drtEstimationResponse,
+        request.preferences().walk().reluctance(),
+        request.preferences().car().reluctance()
+      );
+      drtLeg = new DRTLeg(sl, drtEstimationResponse, legCost);
+    }
+
+    LOG.debug(
+      "[DRT] {} leg decorated | from=({},{}) → ({},{}) | pickupTime={} | waitingSeconds={}s | cost={}",
+      legType,
+      leg.getFrom().coordinate.latitude(),
+      leg.getFrom().coordinate.longitude(),
+      leg.getTo().coordinate.latitude(),
+      leg.getTo().coordinate.longitude(),
+      pickupTime,
+      waitingSeconds,
+      legCost
+    );
+
+    return drtLeg;
   }
 
   private static void flagForDeletion(Itinerary i) {
@@ -62,28 +272,6 @@ public class DecorateWithDRT implements ItineraryListFilter {
         "This itinerary is marked as deleted by the " + NO_DRT_AVAILABLE + " filter."
       )
     );
-  }
-
-  private Itinerary addDRTInformation(Itinerary i, DemandResponsiveTransportationService service) {
-    if (!i.isFlaggedForDeletion()) {
-      var allLegs = i.getLegs();
-      // Legs are processed sequentially within an itinerary: typically 2-5 legs with
-      // only 1-2 car legs needing API calls. The real concurrency is at the itinerary
-      // level (above), so parallelizing legs would add thread pool overhead for no gain.
-      var decoratedLegs = allLegs
-        .stream()
-        .map(leg -> decorateLegWithRideEstimate(i, leg, allLegs, service))
-        .toList();
-
-      if (!i.isFlaggedForDeletion()) {
-        // Fix temporal overlaps first so we can compute the real waiting time
-        // from the consistent timeline.
-        var fixedLegs = fixTemporalOverlaps(decoratedLegs);
-        updateEgressGeneralizedCost(i, allLegs, fixedLegs);
-        i.setLegs(fixedLegs);
-      }
-    }
-    return i;
   }
 
   /**
@@ -157,103 +345,6 @@ public class DecorateWithDRT implements ItineraryListFilter {
       }
     }
     return false;
-  }
-
-  private Leg decorateLegWithRideEstimate(
-    Itinerary i,
-    Leg leg,
-    List<Leg> allLegs,
-    DemandResponsiveTransportationService service
-  ) {
-    // Skip legs already decorated (e.g., access DRT from mapAccessLeg or direct DRT shift)
-    if (leg instanceof DRTLeg) {
-      return leg;
-    }
-    if (leg instanceof StreetLeg sl && sl.getMode().isInCar()) {
-      boolean isEgress = isEgressLeg(leg, allLegs);
-      // For egress legs, use the leg's start time (actual transit arrival time)
-      // instead of the request departure time, since the passenger arrives later.
-      var pickupTime = isEgress ? leg.getStartTime().toInstant() : request.dateTime();
-
-      LOG.info(
-        "decorating {} leg with DRT estimate, pickupTime={}",
-        isEgress ? "egress" : "access",
-        pickupTime
-      );
-
-      var drtEstimationResponse = service.arrivalTimes(
-        request.demandResponsiveExtData().paxAppId(),
-        request.demandResponsiveExtData().areaId(),
-        request.demandResponsiveExtData().userId(),
-        request.demandResponsiveExtData().rideType(),
-        leg.getFrom().coordinate,
-        leg.getTo().coordinate,
-        request.demandResponsiveExtData().passengers().regular(),
-        request.demandResponsiveExtData().passengers().wheelchair(),
-        pickupTime,
-        DrtRequestContext.LEG_DECORATING,
-        request.demandResponsiveExtData().passengerFareType(),
-        true
-      );
-      if (drtEstimationResponse == null) {
-        LOG.warn(
-          "No DRT estimate available for {} leg from ({},{}) to ({},{}) at {} — flagging itinerary for deletion",
-          isEgress ? "egress" : "access",
-          leg.getFrom().coordinate.latitude(),
-          leg.getFrom().coordinate.longitude(),
-          leg.getTo().coordinate.latitude(),
-          leg.getTo().coordinate.longitude(),
-          pickupTime
-        );
-        flagForDeletion(i);
-        return leg;
-      }
-
-      var legType = isEgress ? "egress" : "access";
-      LOG.info(
-        "{} DRT decoration: from ({},{}) to ({},{}) | legStartTime={} | legEndTime={} | pickupTime={} | expectedPickup={} | expectedDropoff={}",
-        legType,
-        leg.getFrom().coordinate.latitude(),
-        leg.getFrom().coordinate.longitude(),
-        leg.getTo().coordinate.latitude(),
-        leg.getTo().coordinate.longitude(),
-        leg.getStartTime().toInstant(),
-        leg.getEndTime().toInstant(),
-        pickupTime,
-        drtEstimationResponse.user_expected_pickup_time(),
-        drtEstimationResponse.user_expected_dropoff_time()
-      );
-
-      if (isTemporallyInfeasible(leg, allLegs, drtEstimationResponse, isEgress)) {
-        flagForDeletion(i);
-        return leg;
-      }
-
-      if (isEgress) {
-        // For egress: the leg starts when the passenger arrives (from previous leg).
-        // Waiting = time between arriving at pickup point and vehicle arriving.
-        var legStartTime = leg.getStartTime();
-        long waitingSeconds = DRTLeg.computeWaitingSeconds(drtEstimationResponse, legStartTime);
-        int legCost = DRTLeg.computeGeneralizedCost(
-          drtEstimationResponse,
-          request.preferences().walk().reluctance(),
-          request.preferences().car().reluctance(),
-          waitingSeconds,
-          1.0 // waitReluctance, same as transit wait
-        );
-        return new DRTLeg(sl, drtEstimationResponse, legCost, legStartTime);
-      } else {
-        // For access: back-compute start time (zero waiting — handled by access shifting)
-        int legCost = DRTLeg.computeGeneralizedCost(
-          drtEstimationResponse,
-          request.preferences().walk().reluctance(),
-          request.preferences().car().reluctance()
-        );
-        return new DRTLeg(sl, drtEstimationResponse, legCost);
-      }
-    } else {
-      return leg;
-    }
   }
 
   /**

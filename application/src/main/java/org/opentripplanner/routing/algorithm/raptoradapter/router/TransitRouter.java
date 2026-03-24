@@ -749,7 +749,7 @@ public class TransitRouter {
       String edgePath = buildEdgePath(path.getLastState());
       String coords = buildPathEndpoints(path.getLastState());
 
-      LOG.info(
+      LOG.debug(
         "  [{}] {} stop={} ({}) | duration={} | cost={} | coords={} | path=[{}]",
         index++,
         label,

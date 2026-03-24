@@ -371,6 +371,27 @@ public class RoutingWorker {
         var legStartTime = request.dateTime().atZone(sl.getStartTime().getZone());
         costDelta += legCost - sl.getGeneralizedCost();
         updatedLegs.add(new DRTLeg(sl, drtResponse, legCost, legStartTime));
+
+        long walkToPickup = drtResponse.pickup_walking_seconds() != null
+          ? drtResponse.pickup_walking_seconds()
+          : 0L;
+        long walkFromDropoff = drtResponse.dropoff_walking_seconds() != null
+          ? drtResponse.dropoff_walking_seconds()
+          : 0L;
+        LOG.info(
+          "[DRT] direct decoration | from=({},{}) → ({},{}) | pickupTime={} | expectedPickup={} | expectedDropoff={} | walkToPickup={}s | walkFromDropoff={}s | waitingSeconds={}s | cost={}",
+          sl.getFrom().coordinate.latitude(),
+          sl.getFrom().coordinate.longitude(),
+          sl.getTo().coordinate.latitude(),
+          sl.getTo().coordinate.longitude(),
+          request.dateTime(),
+          drtResponse.user_expected_pickup_time(),
+          drtResponse.user_expected_dropoff_time(),
+          walkToPickup,
+          walkFromDropoff,
+          waitingSeconds,
+          legCost
+        );
       } else {
         updatedLegs.add(leg);
       }

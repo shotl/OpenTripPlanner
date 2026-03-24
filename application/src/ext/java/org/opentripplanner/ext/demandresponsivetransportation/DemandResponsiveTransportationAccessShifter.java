@@ -2,8 +2,10 @@ package org.opentripplanner.ext.demandresponsivetransportation;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
@@ -52,58 +54,78 @@ public class DemandResponsiveTransportationAccessShifter {
       return results;
     }
 
+    var fromCoordinate = new WgsCoordinate(request.from().getCoordinate());
+    Instant desiredPickupTime = request.dateTime();
+
+    // Phase 1: Identify car accesses and collect unique (from, to, pickupTime) keys
+    record ShiftKey(WgsCoordinate from, WgsCoordinate to, Instant pickupTime) {}
+    record AccessEntry(RoutingAccessEgress ae, ShiftKey key) {}
+    var carAccesses = new ArrayList<AccessEntry>();
+    var shifted = new ArrayList<RoutingAccessEgress>();
+    var uniqueKeys = new LinkedHashMap<ShiftKey, ShiftKey>();
+
+    for (var ae : results) {
+      if (!ae.getLastState().containsModeCar()) {
+        shifted.add(ae);
+        continue;
+      }
+      var stopCoord = stopCoordinateFromAccessEgress(ae, true);
+      var key = new ShiftKey(fromCoordinate, stopCoord, desiredPickupTime);
+      carAccesses.add(new AccessEntry(ae, key));
+      uniqueKeys.putIfAbsent(key, key);
+    }
+
+    if (carAccesses.isEmpty()) {
+      return results;
+    }
+
+    LOG.info(
+      "[DRT] ACCESS shifting | totalCarAccesses={} | uniqueEstimates={}",
+      carAccesses.size(),
+      uniqueKeys.size()
+    );
+
+    // Phase 2: Fetch unique estimates concurrently on the I/O thread pool
     ExecutorService io = DrtIoExecutor.getInstance();
-    var futures = results
-      .stream()
-      .map(ae ->
+    var futures = new LinkedHashMap<ShiftKey, CompletableFuture<Result<DrtShiftResult, Error>>>();
+    for (var key : uniqueKeys.keySet()) {
+      futures.put(
+        key,
         CompletableFuture.supplyAsync(
-          () -> {
-            if (!ae.getLastState().containsModeCar()) {
-              return ae;
-            }
-            return shiftWithDrtTimes(ae, services, request, now, true);
-          },
+          () -> fetchDrtEstimate(services, request, now, key.from(), key.to(), true),
           io
         )
-      )
-      .toList();
-    return futures.stream().map(CompletableFuture::join).filter(Objects::nonNull).toList();
-  }
-
-  private static RoutingAccessEgress shiftWithDrtTimes(
-    RoutingAccessEgress ae,
-    List<DemandResponsiveTransportationService> services,
-    RouteRequest request,
-    Instant now,
-    boolean isAccess
-  ) {
-    var stopCoordinate = stopCoordinateFromAccessEgress(ae, isAccess);
-
-    // For access: origin → stop. For egress: stop → destination.
-    var fromCoordinate = isAccess
-      ? new WgsCoordinate(request.from().getCoordinate())
-      : stopCoordinate;
-    var toCoordinate = isAccess ? stopCoordinate : new WgsCoordinate(request.to().getCoordinate());
-
-    var result = fetchDrtEstimate(services, request, now, fromCoordinate, toCoordinate, isAccess);
-
-    if (result.isSuccess()) {
-      var shift = result.successValue();
-      var preferences = request.preferences();
-      return new DemandResponsiveTransportationAccessAdapter(
-        ae,
-        shift.pickupDelay(),
-        shift.drtTravelDuration(),
-        shift.walkToPickupSeconds(),
-        shift.walkFromDropoffSeconds(),
-        shift.waitingSeconds(),
-        preferences.walk().reluctance(),
-        preferences.car().reluctance(),
-        shift.shotlResponse()
       );
-    } else {
-      return null;
     }
+
+    var shiftResults = new HashMap<ShiftKey, Result<DrtShiftResult, Error>>();
+    for (var entry : futures.entrySet()) {
+      shiftResults.put(entry.getKey(), entry.getValue().join());
+    }
+
+    // Phase 3: Apply results — build adapters for successes, discard failures
+    var preferences = request.preferences();
+    for (var access : carAccesses) {
+      var result = shiftResults.get(access.key());
+      if (result != null && result.isSuccess()) {
+        var shift = result.successValue();
+        shifted.add(
+          new DemandResponsiveTransportationAccessAdapter(
+            access.ae(),
+            shift.pickupDelay(),
+            shift.drtTravelDuration(),
+            shift.walkToPickupSeconds(),
+            shift.walkFromDropoffSeconds(),
+            shift.waitingSeconds(),
+            preferences.walk().reluctance(),
+            preferences.car().reluctance(),
+            shift.shotlResponse()
+          )
+        );
+      }
+    }
+
+    return shifted;
   }
 
   private static WgsCoordinate stopCoordinateFromAccessEgress(
@@ -252,8 +274,10 @@ public class DemandResponsiveTransportationAccessShifter {
       ? drtEstimationResponse.dropoff_walking_seconds()
       : 0L;
 
+    long waitingSeconds = Math.max(0, pickupDelay.toSeconds() - walkToPickupSeconds);
+
     LOG.info(
-      "DRT time shift: from=({},{}) to=({},{}) | requested={} | expectedPickup={} | expectedDropoff={} | pickupDelay={} | drtDuration={} | shotlDurationSeconds={} | walkToPickup={}s | walkFromDropoff={}s",
+      "[DRT] ACCESS shift | from=({},{}) → ({},{}) | requested={} | expectedPickup={} | expectedDropoff={} | pickupDelay={}s | waitingSeconds={}s | drtDuration={}s | walkToPickup={}s | walkFromDropoff={}s",
       fromCoordinate.latitude(),
       fromCoordinate.longitude(),
       toCoordinate.latitude(),
@@ -261,14 +285,12 @@ public class DemandResponsiveTransportationAccessShifter {
       desiredPickupTime,
       userExpectedPickupTime,
       userExpectedDropoffTime,
-      pickupDelay,
-      drtTravelDuration,
-      drtEstimationResponse.shotl_duration_seconds(),
+      pickupDelay.toSeconds(),
+      waitingSeconds,
+      drtTravelDuration.toSeconds(),
       walkToPickupSeconds,
       walkFromDropoffSeconds
     );
-
-    long waitingSeconds = Math.max(0, pickupDelay.toSeconds() - walkToPickupSeconds);
 
     return Result.success(
       new DrtShiftResult(

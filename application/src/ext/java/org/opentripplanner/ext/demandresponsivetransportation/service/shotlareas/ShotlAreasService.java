@@ -77,7 +77,7 @@ public class ShotlAreasService implements JourneyAvailabilityService {
 
     var jsonBody = MAPPER.valueToTree(request);
 
-    LOG.info(
+    LOG.debug(
       "[DRT] Journey availability REQUEST | areaId={} | desiredTime={} | journeyCount={}",
       areaId,
       desiredTime,
@@ -107,7 +107,7 @@ public class ShotlAreasService implements JourneyAvailabilityService {
         .filter(JourneyAvailabilityResponse.JourneyResult::available)
         .count();
 
-      LOG.info(
+      LOG.debug(
         "[DRT] Journey availability RESPONSE | areaId={} | total={} | available={} | unavailable={}",
         areaId,
         response.journeys().size(),
@@ -118,9 +118,10 @@ public class ShotlAreasService implements JourneyAvailabilityService {
       return response;
     } catch (Exception e) {
       LOG.error(
-        "[DRT] Journey availability HTTP ERROR | areaId={} | url={} | error={}",
+        "[DRT] Journey availability HTTP ERROR | areaId={} | url={} | request={} | error={}",
         areaId,
         uri,
+        jsonBody,
         e.getMessage()
       );
       // Return null to indicate the service is unavailable — callers should

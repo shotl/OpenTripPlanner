@@ -117,23 +117,24 @@ public class JourneyAvailabilityFilter {
     }
 
     var filtered = new ArrayList<NearbyStop>(uncheckableStops);
+    var keptStopIds = new ArrayList<String>();
     var removedStopIds = new ArrayList<String>();
 
     for (int i = 0; i < checkableStops.size(); i++) {
+      var stopId = checkableStops.get(i).stop.getId().toString();
       if (response.journeys().get(i).available()) {
         filtered.add(checkableStops.get(i));
+        keptStopIds.add(stopId);
       } else {
-        removedStopIds.add(checkableStops.get(i).stop.getId().toString());
+        removedStopIds.add(stopId);
       }
     }
 
     LOG.info(
-      "[DRT] Journey availability filter | {} phase | areaId={} | input={} | available={} | removed={} | removedStops={}",
+      "[DRT] Journey availability filter | {} phase | areaId={} | keptStops={} | removedStops={}",
       type,
       areaId,
-      checkableStops.size(),
-      filtered.size() - uncheckableStops.size(),
-      removedStopIds.size(),
+      keptStopIds,
       removedStopIds
     );
 

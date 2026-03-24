@@ -39,7 +39,7 @@ public abstract class CachingDemandResponsiveTransportationService
     List<PassengerFareType> passengerFareType,
     boolean pickupShift
   ) {
-    LOG.info(
+    LOG.debug(
       "[DRT] API CALL | context={} | areaId={} | from=({},{}) | to=({},{}) | pickupTime={} | " +
       "fetching from API...",
       context,
@@ -67,7 +67,7 @@ public abstract class CachingDemandResponsiveTransportationService
         pickupShift
       );
 
-      LOG.info(
+      LOG.debug(
         "[DRT] API RESPONSE | context={} | areaId={} | userExpectedPickupTime={} | " +
         "userExpectedDropoffTime={} | status={}",
         context,
