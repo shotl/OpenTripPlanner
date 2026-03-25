@@ -17,6 +17,8 @@ public class DemandResponsiveExtData implements Serializable {
    * compensating for the fact that DRT is typically slower than self-driving.
    */
   public static final double DEFAULT_EGRESS_RELUCTANCE = 1.0;
+  public static final int DEFAULT_ACCESS_BUFFER_SECONDS = 0;
+  public static final int DEFAULT_EGRESS_BUFFER_SECONDS = 0;
 
   @Nullable
   private final String paxAppId;
@@ -37,7 +39,34 @@ public class DemandResponsiveExtData implements Serializable {
   private final List<PassengerFareType> passengerFareType;
 
   private final double egressReluctance;
+  private final int accessBufferSeconds;
+  private final int egressBufferSeconds;
 
+  public DemandResponsiveExtData(
+    @Nullable String paxAppId,
+    @Nullable String userId,
+    @Nullable String areaId,
+    @Nullable String rideType,
+    @Nullable Passengers passengers,
+    @Nullable List<PassengerFareType> passengerFareType,
+    double egressReluctance,
+    int accessBufferSeconds,
+    int egressBufferSeconds
+  ) {
+    this.paxAppId = paxAppId;
+    this.userId = userId;
+    this.areaId = areaId;
+    this.rideType = rideType;
+    this.passengers = passengers;
+    this.passengerFareType = passengerFareType;
+    this.egressReluctance = egressReluctance;
+    this.accessBufferSeconds = accessBufferSeconds;
+    this.egressBufferSeconds = egressBufferSeconds;
+  }
+
+  /**
+   * Backwards-compatible constructor without buffer seconds (defaults to 0).
+   */
   public DemandResponsiveExtData(
     @Nullable String paxAppId,
     @Nullable String userId,
@@ -47,26 +76,6 @@ public class DemandResponsiveExtData implements Serializable {
     @Nullable List<PassengerFareType> passengerFareType,
     double egressReluctance
   ) {
-    this.paxAppId = paxAppId;
-    this.userId = userId;
-    this.areaId = areaId;
-    this.rideType = rideType;
-    this.passengers = passengers;
-    this.passengerFareType = passengerFareType;
-    this.egressReluctance = egressReluctance;
-  }
-
-  /**
-   * Backwards-compatible constructor without egressReluctance (defaults to 1.0).
-   */
-  public DemandResponsiveExtData(
-    @Nullable String paxAppId,
-    @Nullable String userId,
-    @Nullable String areaId,
-    @Nullable String rideType,
-    @Nullable Passengers passengers,
-    @Nullable List<PassengerFareType> passengerFareType
-  ) {
     this(
       paxAppId,
       userId,
@@ -74,12 +83,14 @@ public class DemandResponsiveExtData implements Serializable {
       rideType,
       passengers,
       passengerFareType,
-      DEFAULT_EGRESS_RELUCTANCE
+      egressReluctance,
+      DEFAULT_ACCESS_BUFFER_SECONDS,
+      DEFAULT_EGRESS_BUFFER_SECONDS
     );
   }
 
   /**
-   * Backwards-compatible constructor without passengerFareType and egressReluctance.
+   * Backwards-compatible constructor without passengerFareType, egressReluctance, and buffers.
    */
   public DemandResponsiveExtData(
     @Nullable String paxAppId,
@@ -88,7 +99,17 @@ public class DemandResponsiveExtData implements Serializable {
     @Nullable String rideType,
     @Nullable Passengers passengers
   ) {
-    this(paxAppId, userId, areaId, rideType, passengers, null, DEFAULT_EGRESS_RELUCTANCE);
+    this(
+      paxAppId,
+      userId,
+      areaId,
+      rideType,
+      passengers,
+      null,
+      DEFAULT_EGRESS_RELUCTANCE,
+      DEFAULT_ACCESS_BUFFER_SECONDS,
+      DEFAULT_EGRESS_BUFFER_SECONDS
+    );
   }
 
   /**
@@ -151,6 +172,22 @@ public class DemandResponsiveExtData implements Serializable {
     return egressReluctance;
   }
 
+  /**
+   * Minimum buffer time (in seconds) added after DRT dropoff at a transit stop before the
+   * passenger boards transit (access legs). Protects against missing the transit connection.
+   */
+  public int accessBufferSeconds() {
+    return accessBufferSeconds;
+  }
+
+  /**
+   * Minimum buffer time (in seconds) added after transit arrival before requesting DRT pickup
+   * (egress legs). Protects against the DRT vehicle leaving before the passenger arrives.
+   */
+  public int egressBufferSeconds() {
+    return egressBufferSeconds;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -163,7 +200,9 @@ public class DemandResponsiveExtData implements Serializable {
       Objects.equals(rideType, that.rideType) &&
       Objects.equals(passengers, that.passengers) &&
       Objects.equals(passengerFareType, that.passengerFareType) &&
-      Double.compare(egressReluctance, that.egressReluctance) == 0
+      Double.compare(egressReluctance, that.egressReluctance) == 0 &&
+      accessBufferSeconds == that.accessBufferSeconds &&
+      egressBufferSeconds == that.egressBufferSeconds
     );
   }
 
@@ -176,7 +215,9 @@ public class DemandResponsiveExtData implements Serializable {
       rideType,
       passengers,
       passengerFareType,
-      egressReluctance
+      egressReluctance,
+      accessBufferSeconds,
+      egressBufferSeconds
     );
   }
 
@@ -202,6 +243,10 @@ public class DemandResponsiveExtData implements Serializable {
       passengerFareType +
       ", egressReluctance=" +
       egressReluctance +
+      ", accessBufferSeconds=" +
+      accessBufferSeconds +
+      ", egressBufferSeconds=" +
+      egressBufferSeconds +
       '}'
     );
   }
@@ -218,6 +263,8 @@ public class DemandResponsiveExtData implements Serializable {
     private Passengers passengers;
     private List<PassengerFareType> passengerFareType;
     private double egressReluctance = DEFAULT_EGRESS_RELUCTANCE;
+    private int accessBufferSeconds = DEFAULT_ACCESS_BUFFER_SECONDS;
+    private int egressBufferSeconds = DEFAULT_EGRESS_BUFFER_SECONDS;
 
     public Builder paxAppId(String paxAppId) {
       this.paxAppId = paxAppId;
@@ -254,6 +301,16 @@ public class DemandResponsiveExtData implements Serializable {
       return this;
     }
 
+    public Builder accessBufferSeconds(int accessBufferSeconds) {
+      this.accessBufferSeconds = accessBufferSeconds;
+      return this;
+    }
+
+    public Builder egressBufferSeconds(int egressBufferSeconds) {
+      this.egressBufferSeconds = egressBufferSeconds;
+      return this;
+    }
+
     public DemandResponsiveExtData build() {
       return new DemandResponsiveExtData(
         paxAppId,
@@ -262,7 +319,9 @@ public class DemandResponsiveExtData implements Serializable {
         rideType,
         passengers,
         passengerFareType,
-        egressReluctance
+        egressReluctance,
+        accessBufferSeconds,
+        egressBufferSeconds
       );
     }
   }

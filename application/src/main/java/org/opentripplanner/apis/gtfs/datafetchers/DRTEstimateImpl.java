@@ -161,6 +161,22 @@ public class DRTEstimateImpl implements GraphQLDataFetchers.GraphQLDrtEstimate {
     return env -> (int) getSource(env).getWaitingSeconds();
   }
 
+  @Override
+  public DataFetcher<Integer> pickupWalkingSeconds() {
+    return env -> {
+      Long value = getEstimate(env).pickup_walking_seconds();
+      return value != null ? value.intValue() : null;
+    };
+  }
+
+  @Override
+  public DataFetcher<Integer> dropoffWalkingSeconds() {
+    return env -> {
+      Long value = getEstimate(env).dropoff_walking_seconds();
+      return value != null ? value.intValue() : null;
+    };
+  }
+
   private DRTLeg getSource(DataFetchingEnvironment environment) {
     return environment.getSource();
   }

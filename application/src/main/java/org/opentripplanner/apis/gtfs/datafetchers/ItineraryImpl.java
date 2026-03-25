@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import org.opentripplanner.apis.gtfs.generated.GraphQLDataFetchers;
 import org.opentripplanner.apis.gtfs.mapping.NumberMapper;
+import org.opentripplanner.ext.demandresponsivetransportation.model.DRTLeg;
 import org.opentripplanner.model.SystemNotice;
 import org.opentripplanner.model.plan.Emissions;
 import org.opentripplanner.model.plan.Itinerary;
@@ -83,6 +84,19 @@ public class ItineraryImpl implements GraphQLDataFetchers.GraphQLItinerary {
   @Override
   public DataFetcher<Long> waitingTime() {
     return environment -> (long) getSource(environment).getWaitingDuration().toSeconds();
+  }
+
+  @Override
+  public DataFetcher<Long> drtWaitingTime() {
+    return environment -> {
+      long total = 0;
+      for (var leg : getSource(environment).getLegs()) {
+        if (leg instanceof DRTLeg drtLeg) {
+          total += drtLeg.getWaitingSeconds();
+        }
+      }
+      return total;
+    };
   }
 
   @Override

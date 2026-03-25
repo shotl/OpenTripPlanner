@@ -443,6 +443,8 @@ type DRTEstimate {
   desiredPickupLocation: ShotlGeoLocation!
   "Desired pickup time as epoch seconds."
   desiredPickupTime: Long!
+  "Seconds the user walks from the DRT vehicle dropoff point to the destination/station."
+  dropoffWalkingSeconds: Int
   "Estimated dropoff time as an ISO-8601 datetime with timezone offset."
   estimatedDropoffTime: OffsetDateTime
   "Estimated pickup time as an ISO-8601 datetime with timezone offset."
@@ -453,6 +455,8 @@ type DRTEstimate {
   passengers: ShotlPassengers!
   "Petition time for the ride as epoch seconds."
   petitionTime: Long!
+  "Seconds the user walks from origin/station to the DRT vehicle pickup point."
+  pickupWalkingSeconds: Int
   "Scheduled dropoff place, including location and name."
   scheduledDropoffPlace: ShotlScheduledGeoLocation!
   "Scheduled pickup place, including location and name."
@@ -671,6 +675,12 @@ type Itinerary {
   accessibilityScore: Float
   "Does the itinerary end without dropping off the rented bicycle:"
   arrivedAtDestinationWithRentedBicycle: Boolean
+  """
+  How much time is spent waiting for DRT vehicles at pickup points, in seconds.
+  This is the sum of waitingSeconds from all DRT legs in the itinerary.
+  Note: this waiting time is NOT included in waitingTime (which only captures transit waiting).
+  """
+  drtWaitingTime: Long
   "Duration of the trip on this itinerary, in seconds."
   duration: Long
   "How much elevation is gained, in total, over the course of the itinerary, in meters."
@@ -4126,8 +4136,20 @@ input CyclingOptimizationInput @oneOf {
 
 "Input for DRT (Demand Responsive Transport) ride request."
 input DRTInput {
+  """
+  Minimum buffer time (in seconds) added after DRT dropoff at a transit stop before the
+  passenger boards transit (access legs). Protects against missing the transit connection
+  if the DRT vehicle is slightly late. Default 0 (no buffer).
+  """
+  accessBufferSeconds: Int = 0
   "Area ID for the DRT service."
   areaId: String
+  """
+  Minimum buffer time (in seconds) added after transit arrival before requesting DRT pickup
+  (egress legs). Protects against the DRT vehicle arriving and leaving before the passenger
+  gets off transit and walks to the pickup point. Default 0 (no buffer).
+  """
+  egressBufferSeconds: Int = 0
   """
   Reluctance multiplier applied to CAR-based egress generalized cost before RAPTOR routing.
   A value of 1.0 (default) means no cost inflation. Values greater than 1.0 make DRT egress

@@ -105,6 +105,9 @@ public class DemandResponsiveTransportationAccessShifter {
 
     // Phase 3: Apply results — build adapters for successes, discard failures
     var preferences = request.preferences();
+    int accessBufferSeconds = request.demandResponsiveExtData() != null
+      ? request.demandResponsiveExtData().accessBufferSeconds()
+      : 0;
     for (var access : carAccesses) {
       var result = shiftResults.get(access.key());
       if (result != null && result.isSuccess()) {
@@ -117,6 +120,7 @@ public class DemandResponsiveTransportationAccessShifter {
             shift.walkToPickupSeconds(),
             shift.walkFromDropoffSeconds(),
             shift.waitingSeconds(),
+            accessBufferSeconds,
             preferences.walk().reluctance(),
             preferences.car().reluctance(),
             shift.shotlResponse()

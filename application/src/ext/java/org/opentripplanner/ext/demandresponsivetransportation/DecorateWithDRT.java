@@ -82,6 +82,7 @@ public class DecorateWithDRT implements ItineraryListFilter {
     var extData = request.demandResponsiveExtData();
     int totalCarLegs = 0;
 
+    int egressBufferSeconds = extData != null ? extData.egressBufferSeconds() : 0;
     for (var itinerary : itineraries) {
       if (itinerary.isFlaggedForDeletion()) continue;
       for (var leg : itinerary.getLegs()) {
@@ -89,7 +90,9 @@ public class DecorateWithDRT implements ItineraryListFilter {
         if (leg instanceof StreetLeg sl && sl.getMode().isInCar()) {
           totalCarLegs++;
           boolean isEgress = isEgressLeg(leg, itinerary.getLegs());
-          var pickupTime = isEgress ? leg.getStartTime().toInstant() : request.dateTime();
+          var pickupTime = isEgress
+            ? leg.getStartTime().toInstant().plusSeconds(egressBufferSeconds)
+            : request.dateTime();
           var key = new FetchParams(leg.getFrom().coordinate, leg.getTo().coordinate, pickupTime);
           uniqueRequests.putIfAbsent(key, key);
         }
@@ -201,7 +204,12 @@ public class DecorateWithDRT implements ItineraryListFilter {
     }
 
     boolean isEgress = isEgressLeg(leg, allLegs);
-    var pickupTime = isEgress ? leg.getStartTime().toInstant() : request.dateTime();
+    int egressBuffer = (request.demandResponsiveExtData() != null)
+      ? request.demandResponsiveExtData().egressBufferSeconds()
+      : 0;
+    var pickupTime = isEgress
+      ? leg.getStartTime().toInstant().plusSeconds(egressBuffer)
+      : request.dateTime();
     var key = new FetchParams(leg.getFrom().coordinate, leg.getTo().coordinate, pickupTime);
 
     var drtEstimationResponse = estimates.get(key);
@@ -250,14 +258,19 @@ public class DecorateWithDRT implements ItineraryListFilter {
       drtLeg = new DRTLeg(sl, drtEstimationResponse, legCost);
     }
 
-    LOG.debug(
-      "[DRT] {} leg decorated | from=({},{}) → ({},{}) | pickupTime={} | waitingSeconds={}s | cost={}",
+    LOG.info(
+      "[DRT] {} leg decorated | from=({},{}) → ({},{}) | legStartTime={} | desiredPickupTime={} | egressBuffer={}s | shotlExpectedPickup={} | shotlExpectedDropoff={} | walkToPickup={}s | waitingSeconds={}s | cost={}",
       legType,
       leg.getFrom().coordinate.latitude(),
       leg.getFrom().coordinate.longitude(),
       leg.getTo().coordinate.latitude(),
       leg.getTo().coordinate.longitude(),
+      leg.getStartTime().toInstant(),
       pickupTime,
+      isEgress ? egressBuffer : 0,
+      Instant.ofEpochSecond(drtEstimationResponse.user_expected_pickup_time()),
+      Instant.ofEpochSecond(drtEstimationResponse.user_expected_dropoff_time()),
+      drtEstimationResponse.pickup_walking_seconds(),
       waitingSeconds,
       legCost
     );

@@ -23,8 +23,12 @@ import org.opentripplanner.routing.api.request.preference.ItineraryFilterPrefere
 import org.opentripplanner.routing.api.request.preference.RoutingPreferences;
 import org.opentripplanner.transit.model.framework.FeedScopedId;
 import org.opentripplanner.utils.time.DurationUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RouteRequestMapper {
+
+  private static final Logger LOG = LoggerFactory.getLogger(RouteRequestMapper.class);
 
   public static RouteRequest toRouteRequest(
     DataFetchingEnvironment environment,
@@ -211,19 +215,27 @@ public class RouteRequestMapper {
     double egressReluctance = drtInput.getGraphQLEgressReluctance() != null
       ? drtInput.getGraphQLEgressReluctance()
       : DemandResponsiveExtData.DEFAULT_EGRESS_RELUCTANCE;
-    request.setDemandResponsiveExtData(
-      new DemandResponsiveExtData(
-        drtInput.getGraphQLPaxAppId(),
-        drtInput.getGraphQLUserId(),
-        drtInput.getGraphQLAreaId(),
-        drtInput.getGraphQLRideType(),
-        passengers != null
-          ? new Passengers(passengers.getGraphQLRegular(), passengers.getGraphQLWheelchair())
-          : null,
-        passengerFareTypes,
-        egressReluctance
-      )
+    int accessBufferSeconds = drtInput.getGraphQLAccessBufferSeconds() != null
+      ? drtInput.getGraphQLAccessBufferSeconds()
+      : DemandResponsiveExtData.DEFAULT_ACCESS_BUFFER_SECONDS;
+    int egressBufferSeconds = drtInput.getGraphQLEgressBufferSeconds() != null
+      ? drtInput.getGraphQLEgressBufferSeconds()
+      : DemandResponsiveExtData.DEFAULT_EGRESS_BUFFER_SECONDS;
+    var extData = new DemandResponsiveExtData(
+      drtInput.getGraphQLPaxAppId(),
+      drtInput.getGraphQLUserId(),
+      drtInput.getGraphQLAreaId(),
+      drtInput.getGraphQLRideType(),
+      passengers != null
+        ? new Passengers(passengers.getGraphQLRegular(), passengers.getGraphQLWheelchair())
+        : null,
+      passengerFareTypes,
+      egressReluctance,
+      accessBufferSeconds,
+      egressBufferSeconds
     );
+    LOG.info("[DRT] GraphQL DRT input parsed: {}", extData);
+    request.setDemandResponsiveExtData(extData);
   }
 
   /**

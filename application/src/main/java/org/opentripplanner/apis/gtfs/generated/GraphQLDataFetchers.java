@@ -406,6 +406,10 @@ public class GraphQLDataFetchers {
     public DataFetcher<String> vehicleId();
 
     public DataFetcher<Integer> waitingSeconds();
+
+    public DataFetcher<Integer> pickupWalkingSeconds();
+
+    public DataFetcher<Integer> dropoffWalkingSeconds();
   }
 
   /**
@@ -559,6 +563,8 @@ public class GraphQLDataFetchers {
     public DataFetcher<Iterable<SystemNotice>> systemNotices();
 
     public DataFetcher<Long> waitingTime();
+
+    public DataFetcher<Long> drtWaitingTime();
 
     public DataFetcher<Double> walkDistance();
 
