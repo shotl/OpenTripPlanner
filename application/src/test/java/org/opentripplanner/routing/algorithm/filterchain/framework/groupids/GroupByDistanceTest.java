@@ -87,23 +87,27 @@ public class GroupByDistanceTest implements PlanTestConstants {
 
   @Test
   public void shortTransitMustTakeWalkLegsIntoAccount() {
-    // walk 30 minutes, bus 1 minute => walking account for more than 50% of the distance
+    // walk 10 minutes, bus 1 minute => walking accounts for more than 50% of the distance.
+    // The walk leg meets the distance threshold alone, but the transit leg must still be
+    // included in the key set to ensure grouping is based on the actual transit trip.
 
     // TEST ACCESS
     var itinerary = newItinerary(A, T11_00).walk(D10m, A).bus(11, T11_32, T11_33, B).build();
     var subject = new GroupByDistance(itinerary, 0.5);
 
-    // The walk leg is the main part of the itinerary
-    assertEquals(1, subject.size());
+    // The walk leg meets the threshold, but the transit leg is added to the key set
+    assertEquals(2, subject.size());
     assertSame(itinerary.getLegs().get(0), subject.getKeySet().get(0));
+    assertSame(itinerary.getLegs().get(1), subject.getKeySet().get(1));
 
     // TEST EGRESS
     itinerary = newItinerary(A, T11_00).bus(11, T11_32, T11_33, B).walk(D10m, A).build();
     subject = new GroupByDistance(itinerary, 0.5);
 
-    // The walk leg is the main part of the itinerary
-    assertEquals(1, subject.size());
+    // The walk leg meets the threshold, but the transit leg is added to the key set
+    assertEquals(2, subject.size());
     assertSame(itinerary.getLegs().get(1), subject.getKeySet().get(0));
+    assertSame(itinerary.getLegs().get(0), subject.getKeySet().get(1));
   }
 
   @Test
@@ -200,6 +204,78 @@ public class GroupByDistanceTest implements PlanTestConstants {
     // Match other with suffix leg
     assertFalse(g_11_00.match(g_11_10));
     assertFalse(g_11_10.match(g_11_00));
+  }
+
+  /**
+   * When long street legs (e.g. DRT car access + egress) exceed the distance threshold on their
+   * own, the key set must still include at least one transit leg. Without this, all itineraries
+   * with the same street mode (CAR) are grouped together regardless of which transit route they
+   * use, collapsing route variety down to a single itinerary.
+   */
+  @Test
+  public void keySetIncludesTransitWhenStreetLegsDominateDistance() {
+    // Car access (10 min = 600s at ~CAR_SPEED) + short bus (1 min) + car egress (10 min)
+    // Car legs dominate distance (>85%), but the bus must still be in the key set.
+    var itinerary = newItinerary(A, T11_00)
+      .drive(T11_00, T11_10, B)
+      .bus(11, T11_12, T11_14, C)
+      .drive(T11_15, T11_25, D)
+      .build();
+
+    var subject = new GroupByDistance(itinerary, 0.85);
+
+    // The key set should contain the transit leg even though car legs exceed the threshold
+    boolean hasTransit = subject.getKeySet().stream().anyMatch(Leg::isTransitLeg);
+    assertTrue(hasTransit, "Key set must include at least one transit leg");
+  }
+
+  /**
+   * Two itineraries with the same car access/egress but different bus routes must NOT be
+   * grouped together, even when the car legs dominate distance.
+   */
+  @Test
+  public void differentTransitRoutesNotGroupedWhenStreetLegsDominateDistance() {
+    // Itinerary 1: car + Bus 11 + car
+    var i1 = newItinerary(A, T11_00)
+      .drive(T11_00, T11_10, B)
+      .bus(11, T11_12, T11_14, C)
+      .drive(T11_15, T11_25, D)
+      .build();
+    // Itinerary 2: car + Bus 21 (different route) + car
+    var i2 = newItinerary(A, T11_00)
+      .drive(T11_00, T11_10, B)
+      .bus(21, T11_12, T11_14, C)
+      .drive(T11_15, T11_25, D)
+      .build();
+
+    var g1 = new GroupByDistance(i1, 0.85);
+    var g2 = new GroupByDistance(i2, 0.85);
+
+    assertFalse(g1.match(g2), "Different transit routes must not be grouped together");
+    assertFalse(g2.match(g1), "Different transit routes must not be grouped together");
+  }
+
+  /**
+   * Two itineraries with the same car access/egress AND the same bus trip should still
+   * be grouped together (preserves deduplication of time-shifted access/egress variants).
+   */
+  @Test
+  public void sameTransitRouteGroupedWhenStreetLegsDominateDistance() {
+    var i1 = newItinerary(A, T11_00)
+      .drive(T11_00, T11_10, B)
+      .bus(11, T11_12, T11_14, C)
+      .drive(T11_15, T11_25, D)
+      .build();
+    var i2 = newItinerary(A, T11_00)
+      .drive(T11_00, T11_10, B)
+      .bus(11, T11_12, T11_14, C)
+      .drive(T11_15, T11_25, D)
+      .build();
+
+    var g1 = new GroupByDistance(i1, 0.85);
+    var g2 = new GroupByDistance(i2, 0.85);
+
+    assertTrue(g1.match(g2), "Same transit route should be grouped together");
   }
 
   @Test

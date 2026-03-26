@@ -1,5 +1,6 @@
 package org.opentripplanner.routing.algorithm.filterchain.framework.groupids;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import org.opentripplanner.model.plan.Itinerary;
@@ -111,7 +112,25 @@ public class GroupByDistance implements GroupId<GroupByDistance> {
       sum += legs.get(i).getDistanceMeters();
       ++i;
     }
-    return legs.stream().limit(i).toList();
+
+    var keySet = legs.stream().limit(i).toList();
+
+    // Enforce the documented invariant: "At least one transit leg must be part of the key."
+    // When long street legs (e.g. DRT/car access+egress) meet the distance threshold on their
+    // own, transit legs are excluded from the key. This causes all itineraries with the same
+    // street mode to be grouped together regardless of which transit route they use.
+    // Adding the longest transit leg to the key ensures grouping is based on the actual
+    // transit trip, preserving route variety.
+    if (keySet.stream().noneMatch(Leg::isTransitLeg)) {
+      var longestTransit = legs.stream().filter(Leg::isTransitLeg).findFirst();
+      if (longestTransit.isPresent()) {
+        var extended = new ArrayList<>(keySet);
+        extended.add(longestTransit.get());
+        return List.copyOf(extended);
+      }
+    }
+
+    return keySet;
   }
 
   /** Read-only, package lacal access for unit-test access. */
