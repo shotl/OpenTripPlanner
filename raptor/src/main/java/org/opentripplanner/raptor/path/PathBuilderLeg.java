@@ -517,13 +517,31 @@ public class PathBuilderLeg<T extends RaptorTripSchedule> {
       if (next.isTransfer()) {
         toTime -= next.asTransferLeg().transfer.durationInSeconds();
       }
-      toTime = accessPath.latestArrivalTime(toTime);
-      assertTimeExist(
-        toTime,
-        accessPath,
-        "Access can not be time-shifted before first transit leg."
-      );
-      setTime(toTime - accessPath.durationInSeconds(), toTime);
+      int latestArrival = accessPath.latestArrivalTime(toTime);
+
+      if (latestArrival > toTime) {
+        // The access claims it can arrive AFTER the time the transit needs it. This indicates
+        // a fixed-schedule access (e.g. DRT) whose latestArrivalTime shifts the arrival
+        // forward rather than constraining it. In this case, time-shifting to "as late as
+        // possible" would place the access right before the transit, erasing the real wait
+        // time and producing an incorrect (too low) generalized cost. Instead, anchor the
+        // access at its actual earliest departure time so the wait is correctly reflected.
+        int fromTime = accessPath.earliestDepartureTime(iterationDepartureTime);
+        assertTimeExist(
+          fromTime,
+          accessPath,
+          "Fixed-schedule access can not depart after iteration-departure-time."
+        );
+        setTime(fromTime, fromTime + accessPath.durationInSeconds());
+      } else {
+        toTime = latestArrival;
+        assertTimeExist(
+          toTime,
+          accessPath,
+          "Access can not be time-shifted before first transit leg."
+        );
+        setTime(toTime - accessPath.durationInSeconds(), toTime);
+      }
     }
   }
 
