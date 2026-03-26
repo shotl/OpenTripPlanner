@@ -51,6 +51,8 @@ import org.opentripplanner.transit.model.timetable.TripIdAndServiceDate;
 import org.opentripplanner.transit.model.timetable.TripOnServiceDate;
 import org.opentripplanner.transit.service.TransitService;
 import org.opentripplanner.utils.collection.ListUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This maps the paths found by the Raptor search algorithm to the itinerary structure currently
@@ -59,6 +61,8 @@ import org.opentripplanner.utils.collection.ListUtils;
  * create complete itineraries that can be shown in a trip planner.
  */
 public class RaptorPathToItineraryMapper<T extends TripSchedule> {
+
+  private static final Logger LOG = LoggerFactory.getLogger(RaptorPathToItineraryMapper.class);
 
   private final RaptorTransitData raptorTransitData;
 
@@ -175,7 +179,20 @@ public class RaptorPathToItineraryMapper<T extends TripSchedule> {
       itinerary.setGeneralizedCost2(path.c2());
     }
 
-    itinerary.setGeneralizedCost(toOtpDomainCost(path.c1()) - penaltyCost);
+    int raptorC1 = path.c1();
+    int otpCost = toOtpDomainCost(raptorC1);
+    int finalCost = otpCost - penaltyCost;
+    itinerary.setGeneralizedCost(finalCost);
+
+    LOG.info(
+      "[RaptorMapper] raptorC1={} | otpDomainCost={} | penaltyCost={} | finalCost={} | sumOfLegs={} | legs={}",
+      raptorC1,
+      otpCost,
+      penaltyCost,
+      finalCost,
+      legs.stream().mapToInt(Leg::getGeneralizedCost).sum(),
+      legs.size()
+    );
 
     return itinerary;
   }
