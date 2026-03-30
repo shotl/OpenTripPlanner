@@ -37,7 +37,8 @@ public abstract class CachingDemandResponsiveTransportationService
     Instant desiredPickupTime,
     DrtRequestContext context,
     List<PassengerFareType> passengerFareType,
-    boolean pickupShift
+    boolean pickupShift,
+    String acceptLanguage
   ) {
     LOG.debug(
       "[DRT] API CALL | context={} | areaId={} | from=({},{}) | to=({},{}) | pickupTime={} | " +
@@ -64,7 +65,8 @@ public abstract class CachingDemandResponsiveTransportationService
         desiredPickupTime,
         context,
         passengerFareType,
-        pickupShift
+        pickupShift,
+        acceptLanguage
       );
 
       LOG.debug(
@@ -115,6 +117,7 @@ public abstract class CachingDemandResponsiveTransportationService
     Instant desiredPickupTime,
     DrtRequestContext context,
     List<PassengerFareType> passengerFareType,
-    boolean pickupShift
+    boolean pickupShift,
+    String acceptLanguage
   );
 }

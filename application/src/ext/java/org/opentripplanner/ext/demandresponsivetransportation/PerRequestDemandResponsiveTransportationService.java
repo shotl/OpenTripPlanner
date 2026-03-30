@@ -56,7 +56,8 @@ public class PerRequestDemandResponsiveTransportationService
     Instant desiredPickupTime,
     DrtRequestContext context,
     List<PassengerFareType> passengerFareType,
-    boolean pickupShift
+    boolean pickupShift,
+    String acceptLanguage
   ) {
     var cacheKey = DrtEstimateRequest.create(
       userId,
@@ -96,7 +97,8 @@ public class PerRequestDemandResponsiveTransportationService
       desiredPickupTime,
       context,
       passengerFareType,
-      pickupShift
+      pickupShift,
+      acceptLanguage
     );
     cache.put(cacheKey, Optional.ofNullable(response));
     return response;

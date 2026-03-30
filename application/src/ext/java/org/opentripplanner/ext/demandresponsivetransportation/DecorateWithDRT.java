@@ -129,7 +129,8 @@ public class DecorateWithDRT implements ItineraryListFilter {
               params.pickupTime(),
               DrtRequestContext.LEG_DECORATING,
               extData.passengerFareType(),
-              true
+              true,
+              extData.acceptLanguage()
             ),
           io
         )

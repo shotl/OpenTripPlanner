@@ -344,7 +344,8 @@ public class RoutingWorker {
           request.dateTime(),
           DrtRequestContext.DIRECT_SHIFTING,
           request.demandResponsiveExtData().passengerFareType(),
-          true
+          true,
+          request.demandResponsiveExtData().acceptLanguage()
         );
 
         if (drtResponse == null) {

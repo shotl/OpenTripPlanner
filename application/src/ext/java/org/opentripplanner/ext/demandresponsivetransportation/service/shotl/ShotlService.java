@@ -74,7 +74,8 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
     Instant desiredPickupTime,
     DrtRequestContext context,
     List<PassengerFareType> passengerFareType,
-    boolean pickupShift
+    boolean pickupShift,
+    String acceptLanguage
   ) {
     var uri = UriBuilder.fromUri(timeEstimateUri).build();
 
@@ -145,7 +146,7 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
         uri,
         jsonBody,
         API_TIMEOUT,
-        headers(paxAppId),
+        headers(paxAppId, acceptLanguage),
         is -> {
           try {
             return MAPPER.readValue(is, ShotlApiResponse.class);
@@ -211,9 +212,9 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
     return convertToArrivalEstimateResponse(data);
   }
 
-  private Map<String, String> headers(String paxAppId) {
+  private Map<String, String> headers(String paxAppId, String acceptLanguage) {
     return Map.ofEntries(
-      entry(ACCEPT_LANGUAGE, "en_US"),
+      entry(ACCEPT_LANGUAGE, acceptLanguage != null ? acceptLanguage : "en-US"),
       entry(CONTENT_TYPE, "application/json"),
       entry("Shotl-Passenger-App-Id", paxAppId)
     );

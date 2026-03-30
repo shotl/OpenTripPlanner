@@ -149,7 +149,10 @@ public class TripRequestMapper {
           rideType,
           passengers,
           null,
-          egressReluctance
+          egressReluctance,
+          DemandResponsiveExtData.DEFAULT_ACCESS_BUFFER_SECONDS,
+          DemandResponsiveExtData.DEFAULT_EGRESS_BUFFER_SECONDS,
+          request.locale() != null ? request.locale().toLanguageTag() : null
         )
       );
     }

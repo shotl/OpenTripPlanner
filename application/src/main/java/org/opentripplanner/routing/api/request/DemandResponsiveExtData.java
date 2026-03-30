@@ -19,6 +19,7 @@ public class DemandResponsiveExtData implements Serializable {
   public static final double DEFAULT_EGRESS_RELUCTANCE = 1.0;
   public static final int DEFAULT_ACCESS_BUFFER_SECONDS = 0;
   public static final int DEFAULT_EGRESS_BUFFER_SECONDS = 0;
+  public static final String DEFAULT_ACCEPT_LANGUAGE = "en_US";
 
   @Nullable
   private final String paxAppId;
@@ -41,6 +42,7 @@ public class DemandResponsiveExtData implements Serializable {
   private final double egressReluctance;
   private final int accessBufferSeconds;
   private final int egressBufferSeconds;
+  private final String acceptLanguage;
 
   public DemandResponsiveExtData(
     @Nullable String paxAppId,
@@ -51,7 +53,8 @@ public class DemandResponsiveExtData implements Serializable {
     @Nullable List<PassengerFareType> passengerFareType,
     double egressReluctance,
     int accessBufferSeconds,
-    int egressBufferSeconds
+    int egressBufferSeconds,
+    @Nullable String acceptLanguage
   ) {
     this.paxAppId = paxAppId;
     this.userId = userId;
@@ -62,6 +65,7 @@ public class DemandResponsiveExtData implements Serializable {
     this.egressReluctance = egressReluctance;
     this.accessBufferSeconds = accessBufferSeconds;
     this.egressBufferSeconds = egressBufferSeconds;
+    this.acceptLanguage = acceptLanguage != null ? acceptLanguage : DEFAULT_ACCEPT_LANGUAGE;
   }
 
   /**
@@ -85,7 +89,8 @@ public class DemandResponsiveExtData implements Serializable {
       passengerFareType,
       egressReluctance,
       DEFAULT_ACCESS_BUFFER_SECONDS,
-      DEFAULT_EGRESS_BUFFER_SECONDS
+      DEFAULT_EGRESS_BUFFER_SECONDS,
+      null
     );
   }
 
@@ -108,7 +113,8 @@ public class DemandResponsiveExtData implements Serializable {
       null,
       DEFAULT_EGRESS_RELUCTANCE,
       DEFAULT_ACCESS_BUFFER_SECONDS,
-      DEFAULT_EGRESS_BUFFER_SECONDS
+      DEFAULT_EGRESS_BUFFER_SECONDS,
+      null
     );
   }
 
@@ -188,6 +194,14 @@ public class DemandResponsiveExtData implements Serializable {
     return egressBufferSeconds;
   }
 
+  /**
+   * Accept-Language header value to propagate to DRT service API calls.
+   * Defaults to "en_US" if not set.
+   */
+  public String acceptLanguage() {
+    return acceptLanguage;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -202,7 +216,8 @@ public class DemandResponsiveExtData implements Serializable {
       Objects.equals(passengerFareType, that.passengerFareType) &&
       Double.compare(egressReluctance, that.egressReluctance) == 0 &&
       accessBufferSeconds == that.accessBufferSeconds &&
-      egressBufferSeconds == that.egressBufferSeconds
+      egressBufferSeconds == that.egressBufferSeconds &&
+      Objects.equals(acceptLanguage, that.acceptLanguage)
     );
   }
 
@@ -217,7 +232,8 @@ public class DemandResponsiveExtData implements Serializable {
       passengerFareType,
       egressReluctance,
       accessBufferSeconds,
-      egressBufferSeconds
+      egressBufferSeconds,
+      acceptLanguage
     );
   }
 
@@ -247,6 +263,9 @@ public class DemandResponsiveExtData implements Serializable {
       accessBufferSeconds +
       ", egressBufferSeconds=" +
       egressBufferSeconds +
+      ", acceptLanguage='" +
+      acceptLanguage +
+      '\'' +
       '}'
     );
   }
@@ -265,6 +284,7 @@ public class DemandResponsiveExtData implements Serializable {
     private double egressReluctance = DEFAULT_EGRESS_RELUCTANCE;
     private int accessBufferSeconds = DEFAULT_ACCESS_BUFFER_SECONDS;
     private int egressBufferSeconds = DEFAULT_EGRESS_BUFFER_SECONDS;
+    private String acceptLanguage;
 
     public Builder paxAppId(String paxAppId) {
       this.paxAppId = paxAppId;
@@ -311,6 +331,11 @@ public class DemandResponsiveExtData implements Serializable {
       return this;
     }
 
+    public Builder acceptLanguage(String acceptLanguage) {
+      this.acceptLanguage = acceptLanguage;
+      return this;
+    }
+
     public DemandResponsiveExtData build() {
       return new DemandResponsiveExtData(
         paxAppId,
@@ -321,7 +346,8 @@ public class DemandResponsiveExtData implements Serializable {
         passengerFareType,
         egressReluctance,
         accessBufferSeconds,
-        egressBufferSeconds
+        egressBufferSeconds,
+        acceptLanguage
       );
     }
   }
