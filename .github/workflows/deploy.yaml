@@ -41,13 +41,13 @@ jobs:
             echo "env_short=stg"        >> "$GITHUB_OUTPUT"
             echo "app_version=stg-${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
             echo "is_build_tag=false" >> "$GITHUB_OUTPUT"
-          elif [[ "${GITHUB_REF}" == */tags/* ]]; then
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
             echo "environment=Production" >> "$GITHUB_OUTPUT"
             echo "env_short=prod"         >> "$GITHUB_OUTPUT"
-            echo "app_version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
-            if [[ "${{ env.APP_VERSION }}" == *"-build" ]]; then
-              echo "is_build_tag=true" >> "$GITHUB_OUTPUT"
-              echo "DOCKER_TAG=otp:${APP_VERSION}" >> "$GITHUB_ENV"
+            echo "app_version=${TAG}"     >> "$GITHUB_OUTPUT"
+            if [[ "${TAG}" == *"-build" ]]; then
+              echo "is_build_tag=true"  >> "$GITHUB_OUTPUT"
             else
               echo "is_build_tag=false" >> "$GITHUB_OUTPUT"
             fi
@@ -87,21 +87,26 @@ jobs:
 
       - name: Login to ECR
         if: env.IS_BUILD_TAG == 'true'
-        run: |
-          aws ecr get-login-password --region ${{ vars.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.AWS_REGISTRY }}
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          region: ${{ vars.AWS_REGION }}
 
       - name: Build image and run OTP graph build
         if: env.IS_BUILD_TAG == 'true'
         run: |
           # Build the image with the tag
-          shotool build -t ${{ env.DOCKER_TAG }}
+          shotool build -t otp:${{ env.APP_VERSION }}
 
           # Run OTP entrypoint with graph build in the newly built image
           docker run --rm \
             -v /app/build:/app/build \
-            -e ENV=production \
+            -e ENVIRONMENT=production \
+            -e AWS_REGION=${{ vars.AWS_REGION }} \
+            -e AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }} \
+            -e AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }} \
             ${{ env.AWS_REGISTRY }}/otp:${{ env.APP_VERSION }} \
-            --max-memory 6 build
+            --max-memory 6 build \
+            --osm-file-name restrictions
 
       - name: Deploy
         if: env.IS_BUILD_TAG == 'false'
