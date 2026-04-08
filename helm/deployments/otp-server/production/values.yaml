@@ -1,9 +1,0 @@
-app:
-  command: ["--max-memory", "4", "--config-files-path", "/app/config", "serve"]
-
-  resources:
-    limits:
-      memory: 4096Mi
-    requests:
-      cpu: 250m
-      memory: 2048Mi
