@@ -10,16 +10,6 @@ app:
 
   command: ["--max-memory", "12", "serve"]
 
-  replicas: 1
-
-  # Other pods in the same node might suffer when otp-server is starting
-  resources:
-    limits:
-      memory: 14Gi
-    requests:
-      cpu: 1000m
-      memory: 12Gi
-
   monitoring:
     prometheus:
       enabled: true
@@ -37,15 +27,6 @@ app:
     failureThreshold: 12
     initialDelaySeconds: 60
     path: /otp/actuators/health
-
-  nodeSelector:
-    shotl.com/workload-type: memory-intensive
-
-  tolerations:
-    - key: shotl.com/workload-type
-      operator: Equal
-      value: memory-intensive
-      effect: NoSchedule
 
   serviceAccount:
     annotations:

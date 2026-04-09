@@ -1,0 +1,22 @@
+app:
+  replicas: 1
+
+  # Production environment specific environment vars
+  environment: {}
+
+  # Other pods in the same node might suffer when otp-server is starting
+  resources:
+    limits:
+      memory: 14Gi
+    requests:
+      cpu: 1000m
+      memory: 12Gi
+
+  nodeSelector:
+    shotl.com/workload-type: memory-intensive
+
+  tolerations:
+    - key: shotl.com/workload-type
+      operator: Equal
+      value: memory-intensive
+      effect: NoSchedule
