@@ -4,7 +4,7 @@ oauth2-proxy:
     existingSecret: {{ $appName }}-oauth2-proxy
     configFile: |-
       email_domains = {{ .Environment.oauth2AllowedDomains | toJson }}
-      upstreams = [ "http://otp-server.shotl.svc.cluster.local" ]
+      upstreams = [ "http://{{ $appName }}-server.shotl.svc.cluster.local" ]
       pass_basic_auth = false
       pass_user_headers = true
       pass_host_header = true
@@ -16,7 +16,7 @@ oauth2-proxy:
   gatewayApi:
     enabled: true
     gatewayRef:
-      name: {{ .Environment.gateways.name.general }}
+      name: {{ .Environment.gateways.name.operations }}
       namespace: {{ .Environment.gateways.namespace }}
     hostnames:
       - "{{ $appName }}.{{ .Environment.publicHostedZoneDomain }}"
