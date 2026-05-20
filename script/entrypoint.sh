@@ -96,12 +96,12 @@ function print_help {
   echo "-h,--help print this help"
   echo
   echo "--config-files-path Location where to copy OTP config files from. (default: /app/config)"
-  echo "--osm-file-name Name of the .osm.pbf file to use when building OTP graph. (default: base)"
+  echo "--osm-file-name Name of the .osm.pbf file to use when building OTP graph. (default: otp)"
   echo "--s3-bucket S3 bucket where OSM and GTFS data are stored. This is used to upload OTP graph as well. (default: shotl-maps)"
-  echo "--osm-dir Name of the directory in the S3 bucket where OSM data is stored. (default: osm)"
-  echo "--gtfs-dir Name of the directory in the S3 bucket where GTFS data is stored. (default: gtfs)"
-  echo "--otp-dir Name of the directory in the S3 bucket where OTP data is stored. (default: otp)"
-  echo "--max-memory JVM max memory in GB for the chosen process. (deafult: 2)"
+  echo "--osm-dir Name of the directory in the S3 bucket where OSM data is stored. (default: osm/\$ENVIRONMENT)"
+  echo "--gtfs-dir Name of the directory in the S3 bucket where GTFS data is stored. (default: gtfs/\$ENVIRONMENT)"
+  echo "--otp-dir Name of the directory in the S3 bucket where OTP data is stored. (default: otp/\$ENVIRONMENT)"
+  echo "--max-memory JVM max memory in GB for the chosen process. (default: 2)"
   echo "--extra-args Extra java arguments for the chosen process"
   echo "--mount-path Path where the volume for builds is mounted. (default: /app/build)"
 }
@@ -193,7 +193,7 @@ ACTION="$1"
 set -u
 
 CONFIG_FILES_PATH="${CONFIG_FILES_PATH:-"/app/config/${ENVIRONMENT}"}"
-OSM_FILE_NAME="${OSM_FILE_NAME:-"base"}"
+OSM_FILE_NAME="${OSM_FILE_NAME:-"otp"}"
 S3_BUCKET="${S3_BUCKET:-"shotl-maps"}"
 OSM_DIR="${OSM_DIR:-"osm"}"
 GTFS_DIR="${GTFS_DIR:-"gtfs"}"
