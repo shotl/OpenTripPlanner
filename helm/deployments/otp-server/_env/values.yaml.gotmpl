@@ -32,13 +32,14 @@ app:
     annotations:
       eks.amazonaws.com/role-arn: "arn:aws:iam::{{ .Environment.awsAccountID }}:role/{{ .Environment.clusterName | replace "_" "."}}.{{ $name }}.role"
 
+  # Airflow uses otp-server SA to restart the deployment after completing a new build so the new build for OTP is picked up by the deployment.
   rbac:
     enabled: true
     rules:
       - apiGroups: ["apps", "extensions"]
         resources: ["deployments"]
         resourceNames: ["otp-server"]
-        verbs: ["get", "patch", "update"]
+        verbs: ["get", "list", "watch", "patch"]
 
   volumeMounts:
     - name: build

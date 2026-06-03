@@ -7,10 +7,10 @@ app:
   # Other pods in the same node might suffer when otp-server is starting
   resources:
     limits:
-      memory: 14Gi
+      memory: 3Gi
     requests:
-      cpu: 1000m
-      memory: 12Gi
+      cpu: 500m
+      memory: 2Gi
 
   nodeSelector:
     shotl.com/workload-type: memory-intensive
