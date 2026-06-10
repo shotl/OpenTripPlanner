@@ -8,8 +8,6 @@ app:
   image:
     tag: "{{ .App.imageTag }}"
 
-  command: ["--max-memory", "12", "serve"]
-
   monitoring:
     prometheus:
       enabled: true

@@ -1,6 +1,8 @@
 app:
   replicas: 1
 
+  command: ["--max-memory", "3", "serve"]
+
   # Production environment specific environment vars
   environment: {}
 
