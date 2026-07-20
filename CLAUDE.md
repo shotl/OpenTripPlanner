@@ -767,9 +767,36 @@ This reduces API calls while ensuring all platforms in a station are reachable.
 
 ### Build-Time Validation
 
-During graph build, the system warns if:
-- A DRT-eligible stop has no street vertex (not linked to the street network)
-- A DRT-eligible stop is not reachable by car (e.g., pedestrian-only area)
+During graph build, `DrtStopsModule.validateDrivableStreetLinks()` checks every DRT-eligible stop
+and logs a detailed multi-line diagnostic for each problematic one. Three problem classes:
+
+- **No street vertex**: the stop was never linked to the street network at all
+- **Not car-reachable, MITIGATED**: no incoming car-traversable street link, but a sibling stop in
+  the same parent station is DRT-eligible + car-reachable + has a walk transfer to this stop, so
+  the runtime sibling-expansion feature will still serve it (this is why DRT can "work" for stops
+  that are flagged)
+- **Not car-reachable, NOT MITIGATED**: no sibling fallback exists — the stop will never be served
+  by DRT access
+
+Each warning includes:
+
+- **GTFS stop data**: id, name, code, platform code, description, vehicle type, wheelchair
+  accessibility, coordinates, parent station and its child stop count
+- **Street linkage cause analysis** (mirrors `TransitStopVertex.isReachableByCarForAccess()`):
+  which street vertex the stop is linked to (OSM node id from the loaded OSM data + coordinates),
+  its distance from the stop, every incoming street edge with name/permission/length/car speed and
+  its endpoint node ids/coordinates, and a classification of the root cause — no street→stop link,
+  isolated street vertex, ONE-WAY street pointing away (cars can leave but not arrive), or
+  pedestrian/bicycle-only area. Also reports whether car egress and walk linkage work. All data
+  comes from the graph built from the configured (custom) OSM extract — no external OSM URLs or
+  services are referenced.
+- **DRT impact**: MITIGATED (lists the sibling stops + walk transfer distances that will serve
+  this stop) or NOT MITIGATED. Siblings that are car-reachable but lack a walk transfer are listed
+  separately as near-misses.
+
+A summary INFO line reports totals: directly reachable / mitigated / not mitigated / missing
+vertex. The sibling check is exact because `DrtStopsModule` runs after `DirectTransferGenerator`
+in the graph build pipeline, so walk path transfers are already available.
 
 ---
 
