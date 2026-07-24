@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.locationtech.jts.geom.Coordinate;
@@ -375,28 +376,65 @@ public class StreetIndex {
 
     TraverseMode nonTransitMode = getTraverseModeForLinker(streetMode, endVertex);
 
+    BiFunction<Vertex, StreetVertex, List<Edge>> edgeFunction = endVertex
+      ? (vertex, streetVertex) ->
+        List.of(
+          TemporaryFreeEdge.createTemporaryFreeEdge(streetVertex, (TemporaryStreetLocation) vertex)
+        )
+      : (vertex, streetVertex) ->
+        List.of(
+          TemporaryFreeEdge.createTemporaryFreeEdge((TemporaryStreetLocation) vertex, streetVertex)
+        );
+
     tempEdges.add(
       vertexLinker.linkVertexForRequest(
         temporaryStreetLocation,
         new TraverseModeSet(nonTransitMode),
         endVertex ? LinkingDirection.OUTGOING : LinkingDirection.INCOMING,
-        endVertex
-          ? (vertex, streetVertex) ->
-            List.of(
-              TemporaryFreeEdge.createTemporaryFreeEdge(
-                streetVertex,
-                (TemporaryStreetLocation) vertex
-              )
-            )
-          : (vertex, streetVertex) ->
-            List.of(
-              TemporaryFreeEdge.createTemporaryFreeEdge(
-                (TemporaryStreetLocation) vertex,
-                streetVertex
-              )
-            )
+        edgeFunction
       )
     );
+
+    // For DRT the primary linking above is CAR-only, but the WALK access/egress fallback
+    // search in TransitRouter reuses this same temporary vertex. Link it for WALK as well,
+    // so the walk search never depends on the car snap point being pedestrian-traversable.
+    // Without this, an origin/destination that snaps to a car-only edge silently loses all
+    // walk+transit alternatives.
+    if (
+      streetMode == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION &&
+      nonTransitMode != TraverseMode.WALK
+    ) {
+      int primaryLinkCount = linkedEdgeCount(temporaryStreetLocation, endVertex);
+      tempEdges.add(
+        vertexLinker.linkVertexForRequest(
+          temporaryStreetLocation,
+          new TraverseModeSet(TraverseMode.WALK),
+          endVertex ? LinkingDirection.OUTGOING : LinkingDirection.INCOMING,
+          edgeFunction
+        )
+      );
+      int walkLinkCount = linkedEdgeCount(temporaryStreetLocation, endVertex) - primaryLinkCount;
+      if (primaryLinkCount == 0 || walkLinkCount == 0) {
+        LOG.warn(
+          "[DRT] {} at {} incompletely linked: {}Edges={}, walkEdges={} — the {} search will find nothing from here",
+          endVertex ? "Destination" : "Origin",
+          coordinate,
+          nonTransitMode.name().toLowerCase(),
+          primaryLinkCount,
+          walkLinkCount,
+          primaryLinkCount == 0 ? nonTransitMode : TraverseMode.WALK
+        );
+      } else {
+        LOG.info(
+          "[DRT] {} at {} linked: {}Edges={}, walkEdges={}",
+          endVertex ? "Destination" : "Origin",
+          coordinate,
+          nonTransitMode.name().toLowerCase(),
+          primaryLinkCount,
+          walkLinkCount
+        );
+      }
+    }
 
     if (
       temporaryStreetLocation.getIncoming().isEmpty() &&
@@ -408,6 +446,19 @@ public class StreetIndex {
     temporaryStreetLocation.setWheelchairAccessible(true);
 
     return temporaryStreetLocation;
+  }
+
+  /**
+   * Number of temporary edges connecting the given temporary vertex to the street graph, in the
+   * direction that matters for routing: outgoing for an origin, incoming for a destination.
+   */
+  private static int linkedEdgeCount(
+    TemporaryStreetLocation temporaryStreetLocation,
+    boolean endVertex
+  ) {
+    return endVertex
+      ? temporaryStreetLocation.getIncoming().size()
+      : temporaryStreetLocation.getOutgoing().size();
   }
 
   private TraverseMode getTraverseModeForLinker(StreetMode streetMode, boolean endVertex) {

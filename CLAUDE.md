@@ -276,6 +276,23 @@ Result after filtering: [Stop_A, Stop_C, Stop_E]
 
 Walk-accessible stops are added separately and are NOT filtered by DRT eligibility. This means the router always considers walk+transit as a fallback.
 
+### Dual Origin/Destination Linking (CAR + WALK)
+
+The walk fallback search reuses the same temporary origin/destination vertex as the car search
+(`TemporaryVerticesContainer` is shared). For DRT mode the primary linking is CAR-only, so
+`StreetIndex.createVertexFromCoordinate()` performs a **second WALK linking** on the same
+temporary vertex. Without it, an origin/destination that snaps to a car-only street edge (e.g. a
+carriageway with `foot=no`) would silently lose ALL walk+transit alternatives — Raptor would only
+receive the DRT accesses, producing degenerate itineraries (DRT to a far stop + long waits for
+sparse service).
+
+Diagnostics:
+- `StreetIndex` logs `[DRT] Origin/Destination at (lat,lon) linked: carEdges=N, walkEdges=M`
+  (WARN if either count is 0).
+- `TransitRouter` logs the walk fallback result per phase:
+  `[DRT] ACCESS phase: N entries fed to Raptor = X DRT + Y walk fallback`, and WARNs when the
+  WALK fallback finds 0 stops.
+
 ---
 
 ## 4. Phase 2: Access Shifting (Pre-Raptor)

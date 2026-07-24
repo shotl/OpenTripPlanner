@@ -390,7 +390,27 @@ public class TransitRouter {
         walkStopCountLimit
       );
 
-      results.addAll(AccessEgressMapper.mapNearbyStops(walkNearbyStops, type));
+      var walkAccessEgresses = AccessEgressMapper.mapNearbyStops(walkNearbyStops, type);
+      results.addAll(walkAccessEgresses);
+
+      var location = type.isAccess() ? request.from() : request.to();
+      if (walkAccessEgresses.isEmpty()) {
+        LOG.warn(
+          "[DRT] {} phase: WALK fallback found 0 walk-accessible stops from {} — " +
+          "the {} may be linked to a car-only street edge; walk+transit alternatives will be missing",
+          type,
+          location,
+          type.isAccess() ? "origin" : "destination"
+        );
+      } else {
+        LOG.info(
+          "[DRT] {} phase: {} entries fed to Raptor = {} DRT + {} walk fallback",
+          type,
+          results.size(),
+          accessEgresses.size(),
+          walkAccessEgresses.size()
+        );
+      }
     }
 
     // Special handling of flex accesses
