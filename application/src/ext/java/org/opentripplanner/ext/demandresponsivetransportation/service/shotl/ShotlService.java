@@ -359,9 +359,8 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
         }
       );
     } catch (OtpHttpClientException e) {
-      var status = statusOf(e);
-      if (status == 404 || status == 405) {
-        throw new BatchEstimatesUnsupportedException("rides answered " + status + " on " + uri);
+      if (routeMissing(e)) {
+        throw new BatchEstimatesUnsupportedException("rides has no batch route at " + uri);
       }
       throw e;
     }
@@ -400,6 +399,21 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
       }
     }
     return out;
+  }
+
+  /**
+   * Whether rides answered that the batch route does not exist (an older rides): a 405, or a
+   * 404 that is not one of rides' own answers. rides answers a resource it does not find (an
+   * unknown user, an unknown area) with the code "resource-not-found": the route exists then,
+   * and switching batches off for every request would be wrong.
+   */
+  static boolean routeMissing(Exception e) {
+    var status = statusOf(e);
+    if (status == 405) {
+      return true;
+    }
+    var message = e.getMessage();
+    return status == 404 && (message == null || !message.contains("resource-not-found"));
   }
 
   /** The HTTP status a failed call names in its message; 0 when it names none. */

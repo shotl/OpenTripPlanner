@@ -1,6 +1,7 @@
 package org.opentripplanner.ext.demandresponsivetransportation.service.shotl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -166,6 +167,37 @@ class ShotlServiceBatchTest {
     assertEquals(0, singleCalls.get(), "no retry leg by leg");
     assertEquals(3, answers.size());
     answers.forEach(a -> assertNull(a));
+  }
+
+  @Test
+  void keepsBatchesOnWhenRidesAnswersItsOwnNotFound() throws IOException {
+    var service = start(
+      404,
+      "{\"error\":{\"message\":\"user not found\",\"code\":\"resource-not-found\"}}"
+    );
+
+    var answers = batch(service, 3);
+    batch(service, 2);
+
+    assertEquals(2, batchCalls.get(), "an unknown user does not switch batches off");
+    assertEquals(0, singleCalls.get());
+    answers.forEach(a -> assertNull(a));
+  }
+
+  @Test
+  void tellsAMissingRouteFromRidesOwnNotFound() {
+    assertTrue(
+      ShotlService.routeMissing(
+        new RuntimeException("HTTP request failed with status code 404: {\"error\":\"not found\"}")
+      )
+    );
+    assertTrue(ShotlService.routeMissing(new RuntimeException("with status code 405: x")));
+    assertFalse(
+      ShotlService.routeMissing(
+        new RuntimeException("with status code 404: {\"error\":{\"code\":\"resource-not-found\"}}")
+      )
+    );
+    assertFalse(ShotlService.routeMissing(new RuntimeException("with status code 500: x")));
   }
 
   @Test
