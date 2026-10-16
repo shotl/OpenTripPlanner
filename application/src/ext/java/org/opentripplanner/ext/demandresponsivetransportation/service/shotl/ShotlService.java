@@ -10,13 +10,19 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+import org.opentripplanner.ext.demandresponsivetransportation.BatchEstimatesUnsupportedException;
 import org.opentripplanner.ext.demandresponsivetransportation.CachingDemandResponsiveTransportationService;
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationServiceParameters;
+import org.opentripplanner.ext.demandresponsivetransportation.DrtEstimateItem;
 import org.opentripplanner.ext.demandresponsivetransportation.DrtRequestContext;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
 import org.opentripplanner.framework.io.OtpHttpClient;
+import org.opentripplanner.framework.io.OtpHttpClientException;
 import org.opentripplanner.framework.json.ObjectMappers;
 import org.opentripplanner.routing.api.request.PassengerFareType;
 import org.slf4j.Logger;
@@ -29,6 +35,9 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShotlService.class);
   private static final String DEFAULT_TIME_ESTIMATE_PATH = "v3/drt/time-estimations";
+  private static final String BATCH_SUFFIX = "/batch";
+  /** OtpHttpClient names a failed status only in its message ("...with status code 404: ..."). */
+  private static final Pattern STATUS_CODE = Pattern.compile("status code (\\d{3})");
   private static final ObjectMapper MAPPER = ObjectMappers.ignoringExtraFields();
   private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern(
     "yyyy-MM-dd'T'HH:mm:ss'Z'"
@@ -278,5 +287,128 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
       return "null";
     }
     return TIMESTAMP_FORMATTER.format(Instant.ofEpochSecond(epochSeconds));
+  }
+
+  @Override
+  protected List<ShotlArrivalEstimateResponse> queryArrivalTimesBatch(
+    String paxAppId,
+    String areaId,
+    String userId,
+    String rideType,
+    int regularPassengers,
+    int wheelchairPassengers,
+    DrtRequestContext context,
+    List<PassengerFareType> passengerFareType,
+    boolean pickupShift,
+    String acceptLanguage,
+    List<DrtEstimateItem> items
+  ) {
+    var uri = UriBuilder.fromUri(timeEstimateUri + BATCH_SUFFIX).build();
+    var body = MAPPER.createObjectNode();
+    body.put("area_id", areaId);
+    body.put("user_id", userId);
+    body.put("ride_type", rideType);
+    var passengers = body.putObject("passengers");
+    passengers.put("regular", regularPassengers);
+    passengers.put("wheelchair", wheelchairPassengers);
+    // As the single route: always a pickup shift for access, egress and decoration.
+    body.put("pickup_shift", true);
+    if (passengerFareType != null && !passengerFareType.isEmpty()) {
+      var fares = body.putArray("passenger_fare_type");
+      for (var fare : passengerFareType) {
+        fares.addObject().put("type", fare.type()).put("count", fare.count());
+      }
+    }
+    var array = body.putArray("items");
+    for (int i = 0; i < items.size(); i++) {
+      var item = items.get(i);
+      var node = array.addObject();
+      node.put("key", String.valueOf(i));
+      node
+        .putObject("desired_pickup_location")
+        .put("latitude", item.from().latitude())
+        .put("longitude", item.from().longitude());
+      node
+        .putObject("desired_dropoff_location")
+        .put("latitude", item.to().latitude())
+        .put("longitude", item.to().longitude());
+      if (item.pickupTime() != null) {
+        node.put("desired_pickup_time", item.pickupTime().getEpochSecond());
+      }
+    }
+    LOG.debug(
+      "[DRT] BATCH REQUEST | context={} | url={} | areaId={} | items={}",
+      context,
+      uri,
+      areaId,
+      items.size()
+    );
+    ShotlBatchApiResponse answer;
+    try {
+      answer = otpHttpClient.postJsonAndMap(
+        uri,
+        body,
+        API_TIMEOUT,
+        headers(paxAppId, acceptLanguage),
+        is -> {
+          try {
+            return MAPPER.readValue(is, ShotlBatchApiResponse.class);
+          } catch (Exception e) {
+            throw new RuntimeException("Failed to parse Shotl batch response", e);
+          }
+        }
+      );
+    } catch (OtpHttpClientException e) {
+      var status = statusOf(e);
+      if (status == 404 || status == 405) {
+        throw new BatchEstimatesUnsupportedException("rides answered " + status + " on " + uri);
+      }
+      throw e;
+    }
+    if (!answer.success() || answer.data() == null || answer.data().results() == null) {
+      var reason = answer.reason();
+      throw new IllegalStateException(
+        "batch rejected: " +
+        (reason != null ? reason.code() + " " + reason.message() : "no results")
+      );
+    }
+    var byKey = new HashMap<String, ShotlBatchApiResponse.Item>();
+    for (var result : answer.data().results()) {
+      if (result != null && result.key() != null) {
+        byKey.put(result.key(), result);
+      }
+    }
+    var out = new ArrayList<ShotlArrivalEstimateResponse>(items.size());
+    for (int i = 0; i < items.size(); i++) {
+      var result = byKey.get(String.valueOf(i));
+      if (result == null) {
+        LOG.warn("[DRT] BATCH ITEM MISSING | context={} | areaId={} | key={}", context, areaId, i);
+        out.add(null);
+      } else if (!result.success() || result.data() == null) {
+        var reason = result.reason();
+        LOG.warn(
+          "[DRT] BATCH ITEM REJECTION | context={} | areaId={} | key={} | code={} | message={}",
+          context,
+          areaId,
+          i,
+          reason != null ? reason.code() : "unknown",
+          reason != null ? reason.message() : "unknown"
+        );
+        out.add(null);
+      } else {
+        out.add(convertToArrivalEstimateResponse(result.data()));
+      }
+    }
+    return out;
+  }
+
+  /** The HTTP status a failed call names in its message; 0 when it names none. */
+  static int statusOf(Exception e) {
+    var message = e.getMessage();
+    if (message == null) {
+      return 0;
+    }
+    var matcher = STATUS_CODE.matcher(message);
+    return matcher.find() ? Integer.parseInt(matcher.group(1)) : 0;
   }
 }

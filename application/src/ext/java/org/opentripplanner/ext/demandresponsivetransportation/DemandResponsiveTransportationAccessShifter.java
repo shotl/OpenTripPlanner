@@ -6,8 +6,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
 import org.opentripplanner.routing.algorithm.raptoradapter.transit.RoutingAccessEgress;
@@ -85,22 +83,46 @@ public class DemandResponsiveTransportationAccessShifter {
       uniqueKeys.size()
     );
 
-    // Phase 2: Fetch unique estimates concurrently on the I/O thread pool
-    ExecutorService io = DrtIoExecutor.getInstance();
-    var futures = new LinkedHashMap<ShiftKey, CompletableFuture<Result<DrtShiftResult, Error>>>();
-    for (var key : uniqueKeys.keySet()) {
-      futures.put(
-        key,
-        CompletableFuture.supplyAsync(
-          () -> fetchDrtEstimate(services, request, now, key.from(), key.to(), true),
-          io
-        )
-      );
-    }
-
+    // Phase 2: Fetch every unique estimate in one batch
+    var keys = new ArrayList<>(uniqueKeys.keySet());
     var shiftResults = new HashMap<ShiftKey, Result<DrtShiftResult, Error>>();
-    for (var entry : futures.entrySet()) {
-      shiftResults.put(entry.getKey(), entry.getValue().join());
+    var ext = request.demandResponsiveExtData();
+    if (ext != null) {
+      var items = keys
+        .stream()
+        .map(key -> new DrtEstimateItem(key.from(), key.to(), key.pickupTime()))
+        .toList();
+      var responses = services
+        .get(0)
+        .arrivalTimesBatch(
+          ext.paxAppId(),
+          ext.areaId(),
+          ext.userId(),
+          ext.rideType(),
+          ext.passengers().regular(),
+          ext.passengers().wheelchair(),
+          DrtRequestContext.ACCESS_SHIFTING,
+          ext.passengerFareType(),
+          true,
+          ext.acceptLanguage(),
+          items
+        );
+      for (int i = 0; i < keys.size(); i++) {
+        var key = keys.get(i);
+        var response = i < responses.size() ? responses.get(i) : null;
+        var result = shiftFrom(key.pickupTime(), response, key.from(), key.to());
+        if (result.isFailure()) {
+          LOG.error(
+            "Could not fetch DRT estimate from ({},{}) to ({},{}): {}",
+            key.from().latitude(),
+            key.from().longitude(),
+            key.to().latitude(),
+            key.to().longitude(),
+            result.failureValue()
+          );
+        }
+        shiftResults.put(key, result);
+      }
     }
 
     // Phase 3: Apply results — build adapters for successes, discard failures
@@ -161,30 +183,6 @@ public class DemandResponsiveTransportationAccessShifter {
     return new WgsCoordinate(vertex.getLat(), vertex.getLon());
   }
 
-  private static Result<DrtShiftResult, Error> fetchDrtEstimate(
-    List<DemandResponsiveTransportationService> services,
-    RouteRequest request,
-    Instant now,
-    WgsCoordinate fromCoordinate,
-    WgsCoordinate toCoordinate,
-    boolean isAccess
-  ) {
-    var shiftingResult = shiftTime(request, services, now, fromCoordinate, toCoordinate, isAccess);
-    if (shiftingResult.isSuccess()) {
-      return Result.success(shiftingResult.successValue());
-    } else {
-      LOG.error(
-        "Could not fetch DRT estimate from ({},{}) to ({},{}): {}",
-        fromCoordinate.latitude(),
-        fromCoordinate.longitude(),
-        toCoordinate.latitude(),
-        toCoordinate.longitude(),
-        shiftingResult.failureValue()
-      );
-      return Result.failure(shiftingResult.failureValue());
-    }
-  }
-
   private static boolean shouldShift(RouteRequest req, Instant now) {
     return (
       (req.journey().modes().accessMode == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION ||
@@ -224,6 +222,16 @@ public class DemandResponsiveTransportationAccessShifter {
       true,
       req.demandResponsiveExtData().acceptLanguage()
     );
+    return shiftFrom(desiredPickupTime, drtEstimationResponse, fromCoordinate, toCoordinate);
+  }
+
+  /** The time shift an estimate gives a DRT access leg; a failure when there is none. */
+  private static Result<DrtShiftResult, Error> shiftFrom(
+    Instant desiredPickupTime,
+    ShotlArrivalEstimateResponse drtEstimationResponse,
+    WgsCoordinate fromCoordinate,
+    WgsCoordinate toCoordinate
+  ) {
     if (drtEstimationResponse == null) {
       return Result.failure(Error.NO_ARRIVAL_FOR_LOCATION);
     }

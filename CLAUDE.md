@@ -556,6 +556,8 @@ HTTP timeout: **60 seconds**.
 
 When Shotl returns `success: false`, a `ShotlBusinessRejectionException` is thrown, caught by the service layer, and the itinerary is flagged for deletion (no DRT available for that leg).
 
+Access shifting and leg decoration ask for their legs in batches (`POST {baseUrl}/v3/drt/time-estimations/batch`, see 20.4.5); a rejected item is treated exactly like a single rejection.
+
 ### When the API Is Called (4 Contexts)
 
 | Context | When | Purpose |
@@ -1411,26 +1413,14 @@ One concern is that Shotl estimates contain an `id` field that may be used for b
 
 **Implemented**: All three `parallelStream()` levels in `DecorateWithDRT` and the `parallelStream()` in `DemandResponsiveTransportationAccessShifter` have been replaced with `CompletableFuture.supplyAsync()` using the shared `DrtIoExecutor` thread pool (20 I/O threads). The innermost `parallelStream()` on legs was replaced with a sequential `stream()` since itineraries typically have only 1-2 car legs. This eliminates the `ForkJoinPool` bottleneck that caused all Shotl API calls to run sequentially on single-core deployments.
 
-#### 20.4.5 Shotl API Batch Endpoint (High Impact, High Effort)
+#### 20.4.5 Shotl API Batch Endpoint — IMPLEMENTED
 
-**Current**: Each leg generates one independent HTTP POST to `v3/drt/time-estimations`. 16-50 calls per routing request means 16-50 HTTP round-trips with TCP overhead, serialization/deserialization, and server-side processing.
+**Implemented** (docker-compose `docs/features/intermodal-batch-estimates.md`): access shifting sends every unique access estimate in **one** `POST v3/drt/time-estimations/batch`, and `DecorateWithDRT` sends every unique leg in a second one, so a search makes two calls instead of 16-50. The request carries the shared fields once (`area_id`, `user_id`, `ride_type`, `passengers`, `passenger_fare_type`, `pickup_shift`) and `items[{key, desired_pickup_location, desired_dropoff_location, desired_pickup_time}]`; the answer is `{success, data: {results: [{key, success, data | reason}]}}`, mapped back by key (a missing key or a rejection is `null`, as a single call would be).
 
-**Suggestion**: If the Shotl API supports (or could support) a batch endpoint, send all estimation requests in a single HTTP call:
-
-```json
-POST v3/drt/time-estimations/batch
-{
-  "estimates": [
-    { "from": {...}, "to": {...}, "desired_pickup_time": 1706965200 },
-    { "from": {...}, "to": {...}, "desired_pickup_time": 1706965500 },
-    ...
-  ]
-}
-```
-
-This would reduce HTTP overhead dramatically: 1 round-trip instead of 16-50, and the Shotl backend could optimize internal routing for nearby requests.
-
-**Effort**: Requires changes on the Shotl API side (new endpoint) and on the OTP side (collect all estimation requests, batch them, distribute responses back to callers).
+- `DemandResponsiveTransportationService.arrivalTimesBatch` has a default that asks leg by leg on `DrtIoExecutor`, so other providers and the test stub keep working.
+- `PerRequestDemandResponsiveTransportationService` answers cached legs itself and sends only its misses, once per rounded key.
+- `CachingDemandResponsiveTransportationService`: a 404/405 from rides (no batch route yet) falls back to single calls and tries batches again 10 minutes later; any other batch failure leaves every leg of that phase without an estimate (no retry leg by leg). `OTP_DRT_BATCH_ESTIMATIONS=false` in the environment turns batches off.
+- The direct DRT shift stays single (one leg).
 
 #### 20.4.6 Eagerly Filter Unreachable Stops Before API Calls (Low-Medium Impact, Low Effort)
 
