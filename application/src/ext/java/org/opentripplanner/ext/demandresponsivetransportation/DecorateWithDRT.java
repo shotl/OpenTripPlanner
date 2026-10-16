@@ -10,8 +10,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 import org.opentripplanner.ext.demandresponsivetransportation.model.DRTLeg;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
@@ -109,38 +107,35 @@ public class DecorateWithDRT implements ItineraryListFilter {
       uniqueRequests.size()
     );
 
-    // Phase 2: Fetch unique estimates concurrently on the I/O thread pool
-    ExecutorService io = DrtIoExecutor.getInstance();
-    var futures = new LinkedHashMap<FetchParams, CompletableFuture<ShotlArrivalEstimateResponse>>();
-    for (var params : uniqueRequests.keySet()) {
-      futures.put(
-        params,
-        CompletableFuture.supplyAsync(
-          () ->
-            service.arrivalTimes(
-              extData.paxAppId(),
-              extData.areaId(),
-              extData.userId(),
-              extData.rideType(),
-              params.from(),
-              params.to(),
-              extData.passengers().regular(),
-              extData.passengers().wheelchair(),
-              params.pickupTime(),
-              DrtRequestContext.LEG_DECORATING,
-              extData.passengerFareType(),
-              true,
-              extData.acceptLanguage()
-            ),
-          io
-        )
-      );
+    if (extData == null) {
+      // Without the DRT request data no leg can be estimated (this used to throw).
+      return itineraries;
+    }
+
+    // Phase 2: Fetch every unique estimate in one batch
+    var requested = new ArrayList<>(uniqueRequests.keySet());
+    var responses = service.arrivalTimesBatch(
+      extData.paxAppId(),
+      extData.areaId(),
+      extData.userId(),
+      extData.rideType(),
+      extData.passengers().regular(),
+      extData.passengers().wheelchair(),
+      DrtRequestContext.LEG_DECORATING,
+      extData.passengerFareType(),
+      true,
+      extData.acceptLanguage(),
+      requested.stream().map(p -> new DrtEstimateItem(p.from(), p.to(), p.pickupTime())).toList()
+    );
+    var fetched = new LinkedHashMap<FetchParams, ShotlArrivalEstimateResponse>();
+    for (int i = 0; i < requested.size(); i++) {
+      fetched.put(requested.get(i), i < responses.size() ? responses.get(i) : null);
     }
 
     var estimates = new HashMap<FetchParams, ShotlArrivalEstimateResponse>();
-    for (var entry : futures.entrySet()) {
+    for (var entry : fetched.entrySet()) {
       var params = entry.getKey();
-      var response = entry.getValue().join();
+      var response = entry.getValue();
       estimates.put(params, response);
       if (response != null) {
         long walkToPickup = response.pickup_walking_seconds() != null

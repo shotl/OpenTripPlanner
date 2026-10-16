@@ -2,6 +2,7 @@ package org.opentripplanner.ext.demandresponsivetransportation;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
 import org.opentripplanner.routing.api.request.PassengerFareType;
@@ -42,4 +43,53 @@ public interface DemandResponsiveTransportationService {
     boolean pickupShift,
     String acceptLanguage
   );
+
+  /**
+   * Estimates the legs of one routing phase (every access leg, or every egress leg) that share
+   * everything but their places and pickup time. Answers one response per item, in order, with
+   * null where a leg has no estimate.
+   * <p>
+   * The default asks for each leg on its own, concurrently on the DRT I/O pool, which is what the
+   * callers did before batches existed.
+   */
+  default List<ShotlArrivalEstimateResponse> arrivalTimesBatch(
+    String paxAppId,
+    String areaId,
+    String userId,
+    String rideType,
+    int regularPassengers,
+    int wheelchairPassengers,
+    DrtRequestContext context,
+    List<PassengerFareType> passengerFareType,
+    boolean pickupShift,
+    String acceptLanguage,
+    List<DrtEstimateItem> items
+  ) {
+    var io = DrtIoExecutor.getInstance();
+    var futures = items
+      .stream()
+      .map(item ->
+        CompletableFuture.supplyAsync(
+          () ->
+            arrivalTimes(
+              paxAppId,
+              areaId,
+              userId,
+              rideType,
+              item.from(),
+              item.to(),
+              regularPassengers,
+              wheelchairPassengers,
+              item.pickupTime(),
+              context,
+              passengerFareType,
+              pickupShift,
+              acceptLanguage
+            ),
+          io
+        )
+      )
+      .toList();
+    return futures.stream().map(CompletableFuture::join).toList();
+  }
 }
