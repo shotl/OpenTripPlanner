@@ -4158,6 +4158,15 @@ input DRTInput {
   itineraries from being unfairly filtered out when DRT is used as egress mode.
   """
   egressReluctance: Float = 1.0
+  """
+  Build the final legs: every DRT leg as walk, DRT, walk from the provider's estimate. The DRT
+  leg runs between the scheduled pickup and dropoff places at the vehicle's times, each walk
+  keeps its real duration (left out only when zero), the estimates are asked from the
+  passenger's point and the transit stop, and a connection the real times cannot make removes
+  the itinerary (the margin is accessBufferSeconds / egressBufferSeconds). Default false: the
+  DRT leg is the walk + wait + car + walk leg.
+  """
+  finalLegs: Boolean = false
   "Optional passenger fare types for pricing calculation."
   passengerFareType: [DRTPassengerFareTypeInput!]
   "Passenger information for the DRT ride."

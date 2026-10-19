@@ -424,6 +424,16 @@ This ensures the itinerary's total cost accurately reflects the real DRT data fo
 
 ---
 
+### Final legs (`drt: { finalLegs: true }`)
+
+A caller that sends `finalLegs` gets the itinerary it books, built from the provider's estimate (`DrtFinalLegs`, run at the end of `DecorateWithDRT`):
+
+- estimates are asked from the passenger's point and the transit stop (access: origin → the stop it boards; egress: the stop it alights at → destination), so `pickup_walking_seconds` / `dropoff_walking_seconds` cover the whole walk;
+- every DRT leg becomes **walk → DRT → walk**: the DRT leg (still `CAR` with `drtEstimate`) runs from the scheduled pickup place to the scheduled dropoff place at the vehicle's times, with the provider's names; each walk keeps its real duration (left out only when zero) and replaces the street walks around the car leg;
+- connections are checked with the real times and no slack: an access must reach the stop `accessBufferSeconds` before it departs, an egress passenger must reach the pickup `egressBufferSeconds` before the vehicle; otherwise the itinerary is removed (the 2 min egress tolerance applies only without `finalLegs`).
+
+Without `finalLegs` (older callers) nothing changes.
+
 ## 7. Phase 5: Direct DRT (Door-to-Door)
 
 ### How It Works

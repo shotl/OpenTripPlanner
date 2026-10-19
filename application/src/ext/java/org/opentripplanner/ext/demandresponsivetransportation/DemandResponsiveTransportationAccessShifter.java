@@ -53,6 +53,10 @@ public class DemandResponsiveTransportationAccessShifter {
     }
 
     var fromCoordinate = new WgsCoordinate(request.from().getCoordinate());
+    // The final legs ask from the origin to the transit stop itself, so the provider's walking
+    // seconds cover the whole walk; older callers ask to the car drop-off vertex.
+    boolean finalLegs =
+      request.demandResponsiveExtData() != null && request.demandResponsiveExtData().finalLegs();
     Instant desiredPickupTime = request.dateTime();
 
     // Phase 1: Identify car accesses and collect unique (from, to, pickupTime) keys
@@ -67,7 +71,7 @@ public class DemandResponsiveTransportationAccessShifter {
         shifted.add(ae);
         continue;
       }
-      var stopCoord = stopCoordinateFromAccessEgress(ae, true);
+      var stopCoord = finalLegs ? stopCoordinate(ae) : stopCoordinateFromAccessEgress(ae, true);
       var key = new ShiftKey(fromCoordinate, stopCoord, desiredPickupTime);
       carAccesses.add(new AccessEntry(ae, key));
       uniqueKeys.putIfAbsent(key, key);
@@ -152,6 +156,12 @@ public class DemandResponsiveTransportationAccessShifter {
     }
 
     return shifted;
+  }
+
+  /** The transit stop an access reaches: the vertex of its last state. */
+  private static WgsCoordinate stopCoordinate(RoutingAccessEgress ae) {
+    var vertex = ae.getLastState().getVertex();
+    return new WgsCoordinate(vertex.getLat(), vertex.getLon());
   }
 
   private static WgsCoordinate stopCoordinateFromAccessEgress(

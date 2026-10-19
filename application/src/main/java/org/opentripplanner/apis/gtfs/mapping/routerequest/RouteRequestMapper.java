@@ -233,7 +233,8 @@ public class RouteRequestMapper {
       egressReluctance,
       accessBufferSeconds,
       egressBufferSeconds,
-      request.locale() != null ? request.locale().toLanguageTag() : null
+      request.locale() != null ? request.locale().toLanguageTag() : null,
+      Boolean.TRUE.equals(drtInput.getGraphQLFinalLegs())
     );
     LOG.info("[DRT] GraphQL DRT input parsed: {}", extData);
     request.setDemandResponsiveExtData(extData);

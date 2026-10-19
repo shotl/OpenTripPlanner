@@ -43,6 +43,7 @@ public class DemandResponsiveExtData implements Serializable {
   private final int accessBufferSeconds;
   private final int egressBufferSeconds;
   private final String acceptLanguage;
+  private final boolean finalLegs;
 
   public DemandResponsiveExtData(
     @Nullable String paxAppId,
@@ -56,6 +57,34 @@ public class DemandResponsiveExtData implements Serializable {
     int egressBufferSeconds,
     @Nullable String acceptLanguage
   ) {
+    this(
+      paxAppId,
+      userId,
+      areaId,
+      rideType,
+      passengers,
+      passengerFareType,
+      egressReluctance,
+      accessBufferSeconds,
+      egressBufferSeconds,
+      acceptLanguage,
+      false
+    );
+  }
+
+  public DemandResponsiveExtData(
+    @Nullable String paxAppId,
+    @Nullable String userId,
+    @Nullable String areaId,
+    @Nullable String rideType,
+    @Nullable Passengers passengers,
+    @Nullable List<PassengerFareType> passengerFareType,
+    double egressReluctance,
+    int accessBufferSeconds,
+    int egressBufferSeconds,
+    @Nullable String acceptLanguage,
+    boolean finalLegs
+  ) {
     this.paxAppId = paxAppId;
     this.userId = userId;
     this.areaId = areaId;
@@ -66,6 +95,7 @@ public class DemandResponsiveExtData implements Serializable {
     this.accessBufferSeconds = accessBufferSeconds;
     this.egressBufferSeconds = egressBufferSeconds;
     this.acceptLanguage = acceptLanguage != null ? acceptLanguage : DEFAULT_ACCEPT_LANGUAGE;
+    this.finalLegs = finalLegs;
   }
 
   /**
@@ -202,6 +232,16 @@ public class DemandResponsiveExtData implements Serializable {
     return acceptLanguage;
   }
 
+  /**
+   * Whether the caller wants the final legs: every DRT leg built as walk, DRT, walk from the
+   * provider's estimate (scheduled places, vehicle times, real walking seconds), with the
+   * estimates asked from the passenger's point and the transit stop. False keeps the
+   * walk + wait + car + walk leg of older callers.
+   */
+  public boolean finalLegs() {
+    return finalLegs;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -217,6 +257,7 @@ public class DemandResponsiveExtData implements Serializable {
       Double.compare(egressReluctance, that.egressReluctance) == 0 &&
       accessBufferSeconds == that.accessBufferSeconds &&
       egressBufferSeconds == that.egressBufferSeconds &&
+      finalLegs == that.finalLegs &&
       Objects.equals(acceptLanguage, that.acceptLanguage)
     );
   }
@@ -233,7 +274,8 @@ public class DemandResponsiveExtData implements Serializable {
       egressReluctance,
       accessBufferSeconds,
       egressBufferSeconds,
-      acceptLanguage
+      acceptLanguage,
+      finalLegs
     );
   }
 
@@ -266,6 +308,8 @@ public class DemandResponsiveExtData implements Serializable {
       ", acceptLanguage='" +
       acceptLanguage +
       '\'' +
+      ", finalLegs=" +
+      finalLegs +
       '}'
     );
   }
@@ -285,6 +329,7 @@ public class DemandResponsiveExtData implements Serializable {
     private int accessBufferSeconds = DEFAULT_ACCESS_BUFFER_SECONDS;
     private int egressBufferSeconds = DEFAULT_EGRESS_BUFFER_SECONDS;
     private String acceptLanguage;
+    private boolean finalLegs;
 
     public Builder paxAppId(String paxAppId) {
       this.paxAppId = paxAppId;
@@ -336,6 +381,11 @@ public class DemandResponsiveExtData implements Serializable {
       return this;
     }
 
+    public Builder finalLegs(boolean finalLegs) {
+      this.finalLegs = finalLegs;
+      return this;
+    }
+
     public DemandResponsiveExtData build() {
       return new DemandResponsiveExtData(
         paxAppId,
@@ -347,7 +397,8 @@ public class DemandResponsiveExtData implements Serializable {
         egressReluctance,
         accessBufferSeconds,
         egressBufferSeconds,
-        acceptLanguage
+        acceptLanguage,
+        finalLegs
       );
     }
   }
