@@ -93,5 +93,10 @@ class DrtStopCarReachTest {
 
     assertTrue(reach.access().isEmpty());
     assertTrue(reach.egress().isEmpty());
+    assertEquals(
+      2,
+      reach.reachedPoints(),
+      "the stop and its platform: the road is beyond the limit"
+    );
   }
 }
