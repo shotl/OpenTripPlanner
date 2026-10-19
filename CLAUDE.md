@@ -813,8 +813,11 @@ car point for egress):
   the vehicle would stop: place the virtual stop by that road, or fix the stop's linking in OSM);
 - one WARN line per stop with no car point within 500 m or no street vertex.
 
-Barcelona (2026-10-19): the virtual stops of the DRT stations are within 50 m of a drivable road
-(OSRM car `nearest` agrees: 201 of 206 stops within 50 m, the farthest 109 m).
+Barcelona (2026-10-19, local graph): of 159 FGC/Rodalies DRT stops, 101 are within 50 m, 50
+within 150 m and 8 at 152–181 m; none unreachable. A TMB test set added La Sagrera `3:1.930`
+(L9/L10), linked to an isolated path (the walk reaches 3 points) although a road is 4 m away:
+DRT can never serve it until its linking/OSM is fixed. When a stop is unreachable, the warning
+says how many street points the walk reached (few = isolated path).
 
 ---
 

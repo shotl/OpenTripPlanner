@@ -112,13 +112,17 @@ public class DrtStopsModule implements GraphBuilderModule {
       if (reach.access().isEmpty() || reach.egress().isEmpty()) {
         unreachable++;
         LOG.warn(
-          "[DRT] Stop {} ('{}') at {},{}: no road a vehicle can use within {} m walk ({}). DRT never serves it {}.",
+          "[DRT] Stop {} ('{}') at {},{}: no road a vehicle can use within {} m walk ({}; the walk reached {} street points{}). DRT never serves it {}.",
           stop.getId(),
           stop.getName(),
           stop.getLat(),
           stop.getLon(),
           (int) MAX_WALK_METERS,
           describe(reach),
+          reach.reachedPoints(),
+          reach.reachedPoints() < 20
+            ? ": the stop is linked to an isolated path, check its linking and the paths around it in OSM"
+            : "",
           reach.access().isEmpty() && reach.egress().isEmpty()
             ? "for access or egress"
             : reach.access().isEmpty() ? "for access" : "for egress"

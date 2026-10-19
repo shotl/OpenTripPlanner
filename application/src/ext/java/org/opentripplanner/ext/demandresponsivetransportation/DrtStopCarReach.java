@@ -25,8 +25,12 @@ import org.opentripplanner.street.search.TraverseMode;
  */
 final class DrtStopCarReach {
 
-  /** Walk from the drop-off car point to the stop and from the stop to the pick-up car point. */
-  record Reach(Optional<Walk> access, Optional<Walk> egress) {}
+  /**
+   * Walk from the drop-off car point to the stop and from the stop to the pick-up car point.
+   * {@code reachedPoints} is how many street points the access walk reached: a stop without a
+   * car point and only a few reached points is linked to an isolated path.
+   */
+  record Reach(Optional<Walk> access, Optional<Walk> egress, int reachedPoints) {}
 
   /** The car point and the walking metres between it and the stop. */
   record Walk(Vertex carPoint, double meters) {}
@@ -34,7 +38,9 @@ final class DrtStopCarReach {
   private DrtStopCarReach() {}
 
   static Reach of(TransitStopVertex stop, double maxWalkMeters) {
-    return new Reach(walk(stop, maxWalkMeters, true), walk(stop, maxWalkMeters, false));
+    var reached = new int[1];
+    var access = walk(stop, maxWalkMeters, true, reached);
+    return new Reach(access, walk(stop, maxWalkMeters, false, new int[1]), reached[0]);
   }
 
   /**
@@ -42,7 +48,12 @@ final class DrtStopCarReach {
    * walks from the car point to the stop) or forwards along outgoing edges (from the stop to
    * the car point).
    */
-  private static Optional<Walk> walk(TransitStopVertex stop, double maxMeters, boolean towardStop) {
+  private static Optional<Walk> walk(
+    TransitStopVertex stop,
+    double maxMeters,
+    boolean towardStop,
+    int[] reached
+  ) {
     var best = new HashMap<Vertex, Double>();
     var queue = new PriorityQueue<Map.Entry<Vertex, Double>>(Map.Entry.comparingByValue());
     best.put(stop, 0.0);
@@ -54,6 +65,7 @@ final class DrtStopCarReach {
       if (meters > best.getOrDefault(vertex, Double.MAX_VALUE)) {
         continue;
       }
+      reached[0]++;
       if (vertex != stop && isCarPoint(vertex)) {
         return Optional.of(new Walk(vertex, meters));
       }
