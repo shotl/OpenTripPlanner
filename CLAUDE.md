@@ -784,36 +784,25 @@ This reduces API calls while ensuring all platforms in a station are reachable.
 
 ### Build-Time Validation
 
-During graph build, `DrtStopsModule.validateDrivableStreetLinks()` checks every DRT-eligible stop
-and logs a detailed multi-line diagnostic for each problematic one. Three problem classes:
+The DRT street search never drives into a stop: like a car pick-up it drives to a street, the
+passenger leaves the vehicle and walks to the stop (access), or walks from the stop to where the
+vehicle waits (egress). Stations and most bus stops are linked to footways, platforms or
+sidewalks, so whether the stop's own link allows cars says nothing about DRT.
 
-- **No street vertex**: the stop was never linked to the street network at all
-- **Not car-reachable, MITIGATED**: no incoming car-traversable street link, but a sibling stop in
-  the same parent station is DRT-eligible + car-reachable + has a walk transfer to this stop, so
-  the runtime sibling-expansion feature will still serve it (this is why DRT can "work" for stops
-  that are flagged)
-- **Not car-reachable, NOT MITIGATED**: no sibling fallback exists — the stop will never be served
-  by DRT access
+During graph build, `DrtStopsModule.validateDrivableStreetLinks()` measures, for every
+DRT-eligible stop, the walk on this graph's streets to the nearest **car point** — a street
+vertex a car can both drive into and out of (`DrtStopCarReach`, a Dijkstra over walkable edges
+that never passes through another stop), in both directions (car point → stop for access, stop →
+car point for egress):
 
-Each warning includes:
+- one INFO summary: stops within 50 m, within 150 m, farther (up to 500 m), with no car point
+  within 500 m (never served by DRT), and without a street vertex;
+- one WARN line per stop farther than 150 m, with both walks and the car point's coordinates (where
+  the vehicle would stop: place the virtual stop by that road, or fix the stop's linking in OSM);
+- one WARN line per stop with no car point within 500 m or no street vertex.
 
-- **GTFS stop data**: id, name, code, platform code, description, vehicle type, wheelchair
-  accessibility, coordinates, parent station and its child stop count
-- **Street linkage cause analysis** (mirrors `TransitStopVertex.isReachableByCarForAccess()`):
-  which street vertex the stop is linked to (OSM node id from the loaded OSM data + coordinates),
-  its distance from the stop, every incoming street edge with name/permission/length/car speed and
-  its endpoint node ids/coordinates, and a classification of the root cause — no street→stop link,
-  isolated street vertex, ONE-WAY street pointing away (cars can leave but not arrive), or
-  pedestrian/bicycle-only area. Also reports whether car egress and walk linkage work. All data
-  comes from the graph built from the configured (custom) OSM extract — no external OSM URLs or
-  services are referenced.
-- **DRT impact**: MITIGATED (lists the sibling stops + walk transfer distances that will serve
-  this stop) or NOT MITIGATED. Siblings that are car-reachable but lack a walk transfer are listed
-  separately as near-misses.
-
-A summary INFO line reports totals: directly reachable / mitigated / not mitigated / missing
-vertex. The sibling check is exact because `DrtStopsModule` runs after `DirectTransferGenerator`
-in the graph build pipeline, so walk path transfers are already available.
+Barcelona (2026-10-19): the virtual stops of the DRT stations are within 50 m of a drivable road
+(OSRM car `nearest` agrees: 201 of 206 stops within 50 m, the farthest 109 m).
 
 ---
 
@@ -1103,7 +1092,8 @@ Phase 2 - Access Shifting:
 | `ext/demandresponsivetransportation/DrtIoExecutor.java` | Shared I/O thread pool (20 threads) for concurrent Shotl API calls |
 | `ext/demandresponsivetransportation/DrtEstimateRequest.java` | Cache key (rounded coords + time) |
 | `ext/demandresponsivetransportation/DrtRequestContext.java` | Enum: ACCESS_SHIFTING, EGRESS_SHIFTING, LEG_DECORATING, DIRECT_SHIFTING |
-| `ext/demandresponsivetransportation/DrtStopsModule.java` | Graph build: loads drt_stops.txt |
+| `ext/demandresponsivetransportation/DrtStopsModule.java` | Graph build: loads drt_stops.txt, reports each stop's car reach |
+| `ext/demandresponsivetransportation/DrtStopCarReach.java` | Walk from a DRT stop to the nearest point a vehicle can drive in and out of |
 | `ext/demandresponsivetransportation/DrtStopsDataReader.java` | Reads drt_stops.txt from GTFS feeds |
 | `ext/demandresponsivetransportation/DemandResponsiveTransportationServiceParameters.java` | Config record: enabled, estimationsURL, providerName |
 | `ext/demandresponsivetransportation/configure/DemandResponsiveTransportationServicesModule.java` | Dagger DI module with HTTP client setup |
