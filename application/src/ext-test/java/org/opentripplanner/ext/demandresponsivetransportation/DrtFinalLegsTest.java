@@ -26,6 +26,9 @@ import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.Shot
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse.ShotlScheduledGeoLocation;
 import org.opentripplanner.model.plan.Leg;
 import org.opentripplanner.model.plan.StreetLeg;
+import org.opentripplanner.routing.api.request.DemandResponsiveExtData;
+import org.opentripplanner.routing.api.request.Passengers;
+import org.opentripplanner.routing.api.request.RouteRequest;
 import org.opentripplanner.street.search.TraverseMode;
 
 class DrtFinalLegsTest {
@@ -208,5 +211,45 @@ class DrtFinalLegsTest {
     var legs = newItinerary(A, T11_00).walk(60, B).bus(1, T11_02, T11_10, E).build().getLegs();
 
     assertEquals(legs, DrtFinalLegs.build(legs, 0, 0, WALK_RELUCTANCE).orElseThrow());
+  }
+
+  @Test
+  void anItineraryWhoseDrtLegsWereEstimatedBeforeDecorationStillGetsItsFinalLegs() {
+    // The access shifting already turned the car leg into a DRT leg: decoration has nothing
+    // to estimate, but the itinerary must still become walk, DRT, walk.
+    var est = estimate(T11_00 + 300, T11_00 + 720, 90, 60);
+    var itinerary = newItinerary(A, T11_00)
+      .walk(60, C)
+      .drive(T11_02, T11_10, D)
+      .walk(120, B)
+      .bus(1, T11_20, T11_40, F)
+      .build();
+    itinerary.setLegs(withDrt(itinerary.getLegs(), est));
+    var request = new RouteRequest();
+    request.setDateTime(newTime(T11_00).toInstant());
+    request.setDemandResponsiveExtData(
+      new DemandResponsiveExtData(
+        "app",
+        "user",
+        "area",
+        "SCHEDULE_RIDE",
+        new Passengers(1, 0),
+        null,
+        DemandResponsiveExtData.DEFAULT_EGRESS_RELUCTANCE,
+        0,
+        0,
+        null,
+        true
+      )
+    );
+
+    var out = new DecorateWithDRT(
+      List.of(new TestDemandResponsiveTransportationService()),
+      request
+    ).filter(List.of(itinerary));
+
+    assertEquals(List.of("WALK", "DRT", "WALK", "BUS"), shape(out.get(0).getLegs()));
+    assertEquals("Arc de Triomf", out.get(0).getLegs().get(0).getTo().name.toString());
+    assertEquals(newTime(T11_00 + 300), out.get(0).getLegs().get(1).getStartTime());
   }
 }

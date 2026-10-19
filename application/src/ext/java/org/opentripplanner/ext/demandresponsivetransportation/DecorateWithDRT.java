@@ -98,7 +98,11 @@ public class DecorateWithDRT implements ItineraryListFilter {
     }
 
     if (uniqueRequests.isEmpty()) {
-      return itineraries;
+      // Nothing left to estimate, but legs the access shifting already estimated still
+      // become the final legs.
+      return finalLegs()
+        ? itineraries.stream().map(i -> applyEstimates(i, Map.of())).toList()
+        : itineraries;
     }
 
     LOG.info(
