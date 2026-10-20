@@ -86,7 +86,8 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
     List<PassengerFareType> passengerFareType,
     boolean pickupShift,
     String acceptLanguage,
-    String requestId
+    String requestId,
+    String areaTimezone
   ) {
     var uri = UriBuilder.fromUri(timeEstimateUri).build();
 
@@ -157,7 +158,7 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
         uri,
         jsonBody,
         API_TIMEOUT,
-        headers(paxAppId, acceptLanguage, requestId),
+        headers(paxAppId, acceptLanguage, requestId, areaId, areaTimezone),
         is -> {
           try {
             return MAPPER.readValue(is, ShotlApiResponse.class);
@@ -223,19 +224,34 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
     return convertToArrivalEstimateResponse(data);
   }
 
-  /** The headers of a call to rides; X-Request-Id only when the request has an id. */
-  static Map<String, String> headers(String paxAppId, String acceptLanguage, String requestId) {
+  /**
+   * The headers of a call to rides; X-Request-Id only when the request has an id, X-Area-Timezone
+   * only when it has both an area and its zone.
+   */
+  static Map<String, String> headers(
+    String paxAppId,
+    String acceptLanguage,
+    String requestId,
+    String areaId,
+    String areaTimezone
+  ) {
     var headers = Map.ofEntries(
       entry(ACCEPT_LANGUAGE, acceptLanguage != null ? acceptLanguage : "en-US"),
       entry(CONTENT_TYPE, "application/json"),
       entry("Shotl-Passenger-App-Id", paxAppId)
     );
-    if (requestId == null) {
+    var zone = DemandResponsiveExtData.areaTimezoneHeader(areaId, areaTimezone);
+    if (requestId == null && zone == null) {
       return headers;
     }
-    var withId = new HashMap<>(headers);
-    withId.put(DemandResponsiveExtData.REQUEST_ID_HEADER, requestId);
-    return withId;
+    var withTrace = new HashMap<>(headers);
+    if (requestId != null) {
+      withTrace.put(DemandResponsiveExtData.REQUEST_ID_HEADER, requestId);
+    }
+    if (zone != null) {
+      withTrace.put(DemandResponsiveExtData.AREA_TIMEZONE_HEADER, zone);
+    }
+    return withTrace;
   }
 
   /**
@@ -311,6 +327,7 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
     boolean pickupShift,
     String acceptLanguage,
     String requestId,
+    String areaTimezone,
     List<DrtEstimateItem> items
   ) {
     var uri = UriBuilder.fromUri(timeEstimateUri + BATCH_SUFFIX).build();
@@ -359,7 +376,7 @@ public class ShotlService extends CachingDemandResponsiveTransportationService {
         uri,
         body,
         API_TIMEOUT,
-        headers(paxAppId, acceptLanguage, requestId),
+        headers(paxAppId, acceptLanguage, requestId, areaId, areaTimezone),
         is -> {
           try {
             return MAPPER.readValue(is, ShotlBatchApiResponse.class);

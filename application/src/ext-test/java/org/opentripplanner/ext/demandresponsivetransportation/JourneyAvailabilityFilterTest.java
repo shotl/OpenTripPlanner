@@ -115,7 +115,8 @@ class JourneyAvailabilityFilterTest {
         String areaId,
         Instant desiredTime,
         List<JourneyPair> journeys,
-        String requestId
+        String requestId,
+        String areaTimezone
       ) {
         return null;
       }
@@ -224,11 +225,13 @@ class JourneyAvailabilityFilterTest {
       ),
       AREA_ID,
       DESIRED_TIME,
-      "quote-1"
+      "quote-1",
+      "Europe/Madrid"
     );
 
     assertEquals(1, capturingService.calls, "one call for both phases");
     assertEquals("quote-1", capturingService.capturedRequestId);
+    assertEquals("Europe/Madrid", capturingService.capturedAreaTimezone);
     var pairs = capturingService.capturedJourneys;
     assertEquals(5, pairs.size());
     // The access journeys come first (path origin -> stop), then the egress ones (stop -> path origin)
@@ -243,7 +246,7 @@ class JourneyAvailabilityFilterTest {
   @Test
   void oneCallGivesEachPhaseWhatItsOwnCallGives() {
     // The areas service answers by journey: only journeys touching STOP_B are unavailable.
-    JourneyAvailabilityService byStop = (areaId, desiredTime, journeys, requestId) ->
+    JourneyAvailabilityService byStop = (areaId, desiredTime, journeys, requestId, areaTimezone) ->
       new JourneyAvailabilityResponse(
         journeys
           .stream()
@@ -259,7 +262,13 @@ class JourneyAvailabilityFilterTest {
     var access = createAccessNearbyStops(stopA, stopB, stopC);
     var egress = createEgressNearbyStops(stopB, stopC);
 
-    var merged = filter.filter(Map.of(ACCESS, access, EGRESS, egress), AREA_ID, DESIRED_TIME, null);
+    var merged = filter.filter(
+      Map.of(ACCESS, access, EGRESS, egress),
+      AREA_ID,
+      DESIRED_TIME,
+      null,
+      null
+    );
 
     assertEquals(
       stopIds(filter.filter(access, ACCESS, AREA_ID, DESIRED_TIME)),
@@ -275,12 +284,19 @@ class JourneyAvailabilityFilterTest {
 
   @Test
   void oneCallThatFailsKeepsEveryPhase() {
-    JourneyAvailabilityService failing = (areaId, desiredTime, journeys, requestId) -> null;
+    JourneyAvailabilityService failing = (areaId, desiredTime, journeys, requestId, areaTimezone) ->
+      null;
     var filter = new JourneyAvailabilityFilter(failing);
     var access = createAccessNearbyStops(stopA, stopB);
     var egress = createEgressNearbyStops(stopC);
 
-    var result = filter.filter(Map.of(ACCESS, access, EGRESS, egress), AREA_ID, DESIRED_TIME, null);
+    var result = filter.filter(
+      Map.of(ACCESS, access, EGRESS, egress),
+      AREA_ID,
+      DESIRED_TIME,
+      null,
+      null
+    );
 
     assertSame(access, result.get(ACCESS));
     assertSame(egress, result.get(EGRESS));
@@ -292,7 +308,13 @@ class JourneyAvailabilityFilterTest {
     var access = createAccessNearbyStops(stopA, stopB);
     var egress = createEgressNearbyStops(stopC);
 
-    var result = filter.filter(Map.of(ACCESS, access, EGRESS, egress), AREA_ID, DESIRED_TIME, null);
+    var result = filter.filter(
+      Map.of(ACCESS, access, EGRESS, egress),
+      AREA_ID,
+      DESIRED_TIME,
+      null,
+      null
+    );
 
     assertSame(access, result.get(ACCESS));
     assertSame(egress, result.get(EGRESS));
@@ -308,6 +330,7 @@ class JourneyAvailabilityFilterTest {
       Map.of(ACCESS, createAccessNearbyStops(stopA), EGRESS, egress),
       AREA_ID,
       DESIRED_TIME,
+      null,
       null
     );
 
@@ -325,6 +348,7 @@ class JourneyAvailabilityFilterTest {
       Map.of(ACCESS, List.of(), EGRESS, List.of()),
       AREA_ID,
       DESIRED_TIME,
+      null,
       null
     );
 
@@ -357,7 +381,7 @@ class JourneyAvailabilityFilterTest {
   // --- helpers ---
 
   private JourneyAvailabilityService mockService(List<Boolean> availabilities) {
-    return (areaId, desiredTime, journeys, requestId) -> {
+    return (areaId, desiredTime, journeys, requestId, areaTimezone) -> {
       var results = new ArrayList<JourneyAvailabilityResponse.JourneyResult>();
       for (int i = 0; i < availabilities.size(); i++) {
         results.add(
@@ -429,6 +453,7 @@ class JourneyAvailabilityFilterTest {
     final List<Boolean> responses;
     List<JourneyPair> capturedJourneys;
     String capturedRequestId;
+    String capturedAreaTimezone;
     int calls;
 
     CapturingJourneyAvailabilityService(List<Boolean> responses) {
@@ -440,10 +465,12 @@ class JourneyAvailabilityFilterTest {
       String areaId,
       Instant desiredTime,
       List<JourneyPair> journeys,
-      String requestId
+      String requestId,
+      String areaTimezone
     ) {
       this.capturedJourneys = journeys;
       this.capturedRequestId = requestId;
+      this.capturedAreaTimezone = areaTimezone;
       this.calls++;
       var results = new ArrayList<JourneyAvailabilityResponse.JourneyResult>();
       for (int i = 0; i < journeys.size(); i++) {

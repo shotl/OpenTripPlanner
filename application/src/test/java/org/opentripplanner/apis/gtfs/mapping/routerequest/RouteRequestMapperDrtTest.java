@@ -24,6 +24,10 @@ class RouteRequestMapperDrtTest {
   }
 
   private static Map<String, Object> drt(String requestId) {
+    return drt(requestId, null);
+  }
+
+  private static Map<String, Object> drt(String requestId, String areaTimezone) {
     var drt = new HashMap<String, Object>();
     drt.put("areaId", "area-1");
     drt.put("userId", "user-1");
@@ -31,6 +35,9 @@ class RouteRequestMapperDrtTest {
     drt.put("passengers", Map.of("regular", 1, "wheelchair", 0));
     if (requestId != null) {
       drt.put("requestId", requestId);
+    }
+    if (areaTimezone != null) {
+      drt.put("areaTimezone", areaTimezone);
     }
     return drt;
   }
@@ -65,6 +72,29 @@ class RouteRequestMapperDrtTest {
   }
 
   @Test
+  void mapsTheAreaTimezone() {
+    var ext = map(drt("quote-1", "Europe/Madrid")).demandResponsiveExtData();
+
+    assertEquals("Europe/Madrid", ext.areaTimezone());
+    assertEquals("quote-1", ext.requestId());
+    assertEquals("area-1", ext.areaId());
+  }
+
+  @Test
+  void noAreaTimezoneWithoutOne() {
+    assertNull(map(drt("quote-1")).demandResponsiveExtData().areaTimezone());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = { "", "+01:00", "Z", "GMT+1", "Europe/Nowhere", "Europe/Madrid\r\nX: 1" })
+  void ignoresAnInvalidAreaTimezone(String areaTimezone) {
+    var ext = map(drt("quote-1", areaTimezone)).demandResponsiveExtData();
+
+    assertNull(ext.areaTimezone());
+    assertEquals("quote-1", ext.requestId(), "the request itself still maps");
+  }
+
+  @Test
   void noDrtInputWithoutTheDrtArgument() {
     var env = executionContext(
       createArgsCopy(RouteRequestMapperTest.ARGS),
@@ -72,6 +102,7 @@ class RouteRequestMapperDrtTest {
       RouteRequestMapperTest.CONTEXT
     );
     assertNull(RouteRequestMapper.drtRequestId(env));
+    assertNull(RouteRequestMapper.drtAreaTimezone(env));
     assertNull(
       RouteRequestMapper.toRouteRequest(
         env,

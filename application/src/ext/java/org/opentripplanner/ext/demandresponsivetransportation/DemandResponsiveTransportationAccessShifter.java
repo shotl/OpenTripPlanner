@@ -110,6 +110,7 @@ public class DemandResponsiveTransportationAccessShifter {
           true,
           ext.acceptLanguage(),
           ext.requestId(),
+          ext.areaTimezone(),
           items
         );
       for (int i = 0; i < keys.size(); i++) {
@@ -232,7 +233,8 @@ public class DemandResponsiveTransportationAccessShifter {
       req.demandResponsiveExtData().passengerFareType(),
       true,
       req.demandResponsiveExtData().acceptLanguage(),
-      req.demandResponsiveExtData().requestId()
+      req.demandResponsiveExtData().requestId(),
+      req.demandResponsiveExtData().areaTimezone()
     );
     return shiftFrom(desiredPickupTime, drtEstimationResponse, fromCoordinate, toCoordinate);
   }

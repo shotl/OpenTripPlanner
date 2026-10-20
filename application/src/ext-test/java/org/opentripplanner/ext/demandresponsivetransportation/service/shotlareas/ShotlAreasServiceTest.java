@@ -26,6 +26,7 @@ class ShotlAreasServiceTest {
 
   private HttpServer server;
   private final List<String> requestIds = new CopyOnWriteArrayList<>();
+  private final List<String> areaTimezones = new CopyOnWriteArrayList<>();
 
   @AfterEach
   void stop() {
@@ -38,6 +39,7 @@ class ShotlAreasServiceTest {
     server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
     server.createContext("/journey-availability", exchange -> {
       requestIds.add(String.valueOf(exchange.getRequestHeaders().getFirst("X-Request-Id")));
+      areaTimezones.add(String.valueOf(exchange.getRequestHeaders().getFirst("X-Area-Timezone")));
       var bytes = "{\"journeys\":[{\"available\":true}]}".getBytes(StandardCharsets.UTF_8);
       exchange.sendResponseHeaders(200, bytes.length);
       exchange.getResponseBody().write(bytes);
@@ -53,7 +55,7 @@ class ShotlAreasServiceTest {
   void sendsTheRequestId() throws IOException {
     var service = start();
 
-    var response = service.checkAvailability("area-1", Instant.EPOCH, JOURNEYS, "quote-1");
+    var response = service.checkAvailability("area-1", Instant.EPOCH, JOURNEYS, "quote-1", null);
 
     assertNotNull(response);
     assertEquals(1, response.journeys().size());
@@ -64,8 +66,37 @@ class ShotlAreasServiceTest {
   void sendsNoRequestIdWithoutOne() throws IOException {
     var service = start();
 
-    assertNotNull(service.checkAvailability("area-1", Instant.EPOCH, JOURNEYS, null));
+    assertNotNull(service.checkAvailability("area-1", Instant.EPOCH, JOURNEYS, null, null));
 
     assertEquals(List.of("null"), requestIds, "no X-Request-Id header");
+    assertEquals(List.of("null"), areaTimezones, "no X-Area-Timezone header");
+  }
+
+  @Test
+  void sendsTheAreaTimezone() throws IOException {
+    var service = start();
+
+    var response = service.checkAvailability(
+      "area-1",
+      Instant.EPOCH,
+      JOURNEYS,
+      "quote-1",
+      "Europe/Madrid"
+    );
+
+    assertNotNull(response);
+    assertEquals(List.of("quote-1"), requestIds);
+    assertEquals(List.of("area-1=Europe/Madrid"), areaTimezones);
+  }
+
+  @Test
+  void sendsNoAreaTimezoneWithoutAValidOneOrAnArea() throws IOException {
+    var service = start();
+
+    assertNotNull(service.checkAvailability("area-1", Instant.EPOCH, JOURNEYS, null, null));
+    assertNotNull(service.checkAvailability("area-1", Instant.EPOCH, JOURNEYS, null, "+01:00"));
+    assertNotNull(service.checkAvailability(null, Instant.EPOCH, JOURNEYS, null, "Europe/Madrid"));
+
+    assertEquals(List.of("null", "null", "null"), areaTimezones, "no X-Area-Timezone header");
   }
 }

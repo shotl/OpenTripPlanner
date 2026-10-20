@@ -42,6 +42,8 @@ class ShotlServiceBatchTest {
   private final AtomicReference<JsonNode> lastBatch = new AtomicReference<>();
   private final List<String> batchRequestIds = new CopyOnWriteArrayList<>();
   private final List<String> singleRequestIds = new CopyOnWriteArrayList<>();
+  private final List<String> batchAreaTimezones = new CopyOnWriteArrayList<>();
+  private final List<String> singleAreaTimezones = new CopyOnWriteArrayList<>();
 
   @AfterEach
   void stop() {
@@ -55,6 +57,9 @@ class ShotlServiceBatchTest {
     server.createContext("/v3/drt/time-estimations/batch", exchange -> {
       batchCalls.incrementAndGet();
       batchRequestIds.add(String.valueOf(exchange.getRequestHeaders().getFirst("X-Request-Id")));
+      batchAreaTimezones.add(
+        String.valueOf(exchange.getRequestHeaders().getFirst("X-Area-Timezone"))
+      );
       lastBatch.set(MAPPER.readTree(exchange.getRequestBody()));
       var bytes = batchBody.getBytes(StandardCharsets.UTF_8);
       exchange.sendResponseHeaders(batchStatus, bytes.length);
@@ -67,6 +72,9 @@ class ShotlServiceBatchTest {
       }
       singleCalls.incrementAndGet();
       singleRequestIds.add(String.valueOf(exchange.getRequestHeaders().getFirst("X-Request-Id")));
+      singleAreaTimezones.add(
+        String.valueOf(exchange.getRequestHeaders().getFirst("X-Area-Timezone"))
+      );
       var bytes =
         ("{\"success\":true,\"data\":" + estimate("single") + "}").getBytes(StandardCharsets.UTF_8);
       exchange.sendResponseHeaders(200, bytes.length);
@@ -103,10 +111,19 @@ class ShotlServiceBatchTest {
   }
 
   private static List<ShotlArrivalEstimateResponse> batch(ShotlService s, int n) {
-    return batch(s, n, "quote-1");
+    return batch(s, n, "quote-1", "Europe/Madrid");
   }
 
   private static List<ShotlArrivalEstimateResponse> batch(ShotlService s, int n, String requestId) {
+    return batch(s, n, requestId, null);
+  }
+
+  private static List<ShotlArrivalEstimateResponse> batch(
+    ShotlService s,
+    int n,
+    String requestId,
+    String areaTimezone
+  ) {
     return s.arrivalTimesBatch(
       "app-1",
       "area-1",
@@ -119,11 +136,20 @@ class ShotlServiceBatchTest {
       true,
       "es",
       requestId,
+      areaTimezone,
       items(n)
     );
   }
 
   private static ShotlArrivalEstimateResponse single(ShotlService s, String requestId) {
+    return single(s, requestId, null);
+  }
+
+  private static ShotlArrivalEstimateResponse single(
+    ShotlService s,
+    String requestId,
+    String areaTimezone
+  ) {
     return s.arrivalTimes(
       "app-1",
       "area-1",
@@ -138,7 +164,8 @@ class ShotlServiceBatchTest {
       List.of(),
       true,
       "es",
-      requestId
+      requestId,
+      areaTimezone
     );
   }
 
@@ -187,6 +214,57 @@ class ShotlServiceBatchTest {
     assertEquals(List.of("quote-1"), batchRequestIds);
     assertEquals(5, singleRequestIds.size());
     singleRequestIds.forEach(id -> assertEquals("quote-1", id, "leg by leg keeps the id"));
+    assertEquals(List.of("area-1=Europe/Madrid"), batchAreaTimezones);
+    assertEquals(5, singleAreaTimezones.size());
+    singleAreaTimezones.forEach(zone ->
+      assertEquals("area-1=Europe/Madrid", zone, "leg by leg keeps the zone")
+    );
+  }
+
+  @Test
+  void sendsTheAreaTimezoneOnTheBatchCall() throws IOException {
+    var service = start(200, "{\"success\":true,\"data\":{\"results\":[]}}");
+
+    batch(service, 2, "quote-1", "America/Argentina/Buenos_Aires");
+
+    assertEquals(List.of("area-1=America/Argentina/Buenos_Aires"), batchAreaTimezones);
+  }
+
+  @Test
+  void sendsNoAreaTimezoneOnTheBatchCallWithoutOne() throws IOException {
+    var service = start(200, "{\"success\":true,\"data\":{\"results\":[]}}");
+
+    batch(service, 2, "quote-1", null);
+
+    assertEquals(List.of("null"), batchAreaTimezones, "no X-Area-Timezone header");
+  }
+
+  @Test
+  void sendsTheAreaTimezoneOnASingleCallAndNoneWithoutOne() throws IOException {
+    var service = start(200, "{}");
+
+    assertNotNull(single(service, "quote-2", "Europe/Rome"));
+    assertNotNull(single(service, "quote-2", null));
+
+    assertEquals(List.of("area-1=Europe/Rome", "null"), singleAreaTimezones);
+  }
+
+  @Test
+  void theAreaTimezoneHeaderNeedsAnAreaAndAValidZone() {
+    assertEquals(
+      "area-1=Europe/Madrid",
+      ShotlService.headers("app-1", "es", null, "area-1", "Europe/Madrid").get("X-Area-Timezone")
+    );
+    assertNull(
+      ShotlService.headers("app-1", "es", null, null, "Europe/Madrid").get("X-Area-Timezone")
+    );
+    assertNull(
+      ShotlService.headers("app-1", "es", null, "a=b", "Europe/Madrid").get("X-Area-Timezone")
+    );
+    assertNull(
+      ShotlService.headers("app-1", "es", null, "area-1", "+01:00").get("X-Area-Timezone")
+    );
+    assertEquals(3, ShotlService.headers("app-1", "es", null, "area-1", null).size());
   }
 
   @Test

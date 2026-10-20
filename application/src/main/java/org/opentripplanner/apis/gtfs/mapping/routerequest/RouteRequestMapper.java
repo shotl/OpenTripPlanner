@@ -76,7 +76,12 @@ public class RouteRequestMapper {
     // sadly we need to use the raw collection because it is cast to the wrong type
     mapViaPoints(request, environment.getArgument("via"));
 
-    setDrtInput(request, args.getGraphQLDrt(), drtRequestId(environment));
+    setDrtInput(
+      request,
+      args.getGraphQLDrt(),
+      drtRequestId(environment),
+      drtAreaTimezone(environment)
+    );
 
     return request;
   }
@@ -88,8 +93,19 @@ public class RouteRequestMapper {
    */
   @Nullable
   static String drtRequestId(DataFetchingEnvironment environment) {
+    return rawDrtString(environment, "requestId");
+  }
+
+  /** {@code drt.areaTimezone}, read from the raw argument like {@link #drtRequestId}. */
+  @Nullable
+  static String drtAreaTimezone(DataFetchingEnvironment environment) {
+    return rawDrtString(environment, "areaTimezone");
+  }
+
+  @Nullable
+  private static String rawDrtString(DataFetchingEnvironment environment, String field) {
     Map<String, Object> drt = environment.getArgument("drt");
-    return drt != null && drt.get("requestId") instanceof String requestId ? requestId : null;
+    return drt != null && drt.get(field) instanceof String value ? value : null;
   }
 
   private static void setPreferences(
@@ -212,7 +228,8 @@ public class RouteRequestMapper {
   private static void setDrtInput(
     RouteRequest request,
     GraphQLTypes.GraphQLDrtInput drtInput,
-    @Nullable String requestId
+    @Nullable String requestId,
+    @Nullable String areaTimezone
   ) {
     // Check if drtInput has meaningful data (not just an empty object from the code generator)
     if (drtInput == null || !hasDrtData(drtInput)) {
@@ -251,7 +268,8 @@ public class RouteRequestMapper {
       egressBufferSeconds,
       request.locale() != null ? request.locale().toLanguageTag() : null,
       Boolean.TRUE.equals(drtInput.getGraphQLFinalLegs()),
-      requestId
+      requestId,
+      areaTimezone
     );
     LOG.info("[DRT] GraphQL DRT input parsed: {}", extData);
     request.setDemandResponsiveExtData(extData);

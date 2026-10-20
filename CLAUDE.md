@@ -140,6 +140,7 @@ query {
 | `passengerFareType` | List | No | null | Fare type breakdown for pricing |
 | `egressReluctance` | Float | No | 1.0 | Multiplier to inflate CAR egress cost before Raptor |
 | `requestId` | String | No | null | Caller's request id (1..128 of `[A-Za-z0-9._:-]`, else ignored), sent as `X-Request-Id` on every rides and areas call |
+| `areaTimezone` | String | No | null | IANA zone of the area (`Europe/Madrid`; a region id of at most 64 of `[A-Za-z0-9/_+-]` that `ZoneId.of` knows, offsets and unknown zones ignored), sent as `X-Area-Timezone: <areaId>=<zone>` on every rides and areas call |
 
 ### Mode Combinations
 
@@ -578,11 +579,17 @@ Access shifting and leg decoration ask for their legs in batches (`POST {baseUrl
 | `LEG_DECORATING` | Post-Raptor, in DecorateWithDRT filter | Replace car legs with real DRT data |
 | `DIRECT_SHIFTING` | After direct street routing | Replace direct car legs with real DRT data |
 
-### Request id and journey availability
+### Request id, area time zone and journey availability
 
 - `drt.requestId` (read from the raw `drt` argument in `RouteRequestMapper`, kept in
   `DemandResponsiveExtData.requestId()`) goes out as `X-Request-Id` on the rides estimate calls
-  (single and batch) and on the areas `POST /journey-availability` call. Without it no header is sent.
+  (single and batch, and leg by leg when rides has no batch route) and on the areas
+  `POST /journey-availability` call. Without it no header is sent.
+- `drt.areaTimezone` takes the same path (raw argument, `DemandResponsiveExtData.areaTimezone()`,
+  validated by `validAreaTimezone`: a region id `ZoneId.of` knows whose id is its own name, so
+  `+01:00`, `Z` and `GMT+1` are dropped) and goes out on the same calls as
+  `X-Area-Timezone: <areaId>=<zone>` (`DemandResponsiveExtData.areaTimezoneHeader`). No header
+  without a zone, or without an `areaId` of 1..128 of `[A-Za-z0-9._:-]`.
 - With `server.traceParameters` (see Configuration) the inbound `X-Request-Id` header is the
   `correlationId` log key (`%X{correlationId}` in `logback.xml`) and is echoed on the response.
   `DrtLogContext` copies the caller's MDC to the DRT I/O pool and to the parallel-routing threads.

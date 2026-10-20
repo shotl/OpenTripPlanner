@@ -28,6 +28,8 @@ public interface DemandResponsiveTransportationService {
    * @param pickupShift whether this is a pickup shift request (true for egress decoration)
    * @param acceptLanguage Accept-Language header value to forward to the DRT provider
    * @param requestId the caller's request id, sent as {@code X-Request-Id}; null sends none
+   * @param areaTimezone the area's IANA zone, sent with the area id as
+   *                     {@code X-Area-Timezone}; null sends none
    */
   ShotlArrivalEstimateResponse arrivalTimes(
     String paxAppId,
@@ -43,7 +45,8 @@ public interface DemandResponsiveTransportationService {
     List<PassengerFareType> passengerFareType,
     boolean pickupShift,
     String acceptLanguage,
-    String requestId
+    String requestId,
+    String areaTimezone
   );
 
   /**
@@ -66,6 +69,7 @@ public interface DemandResponsiveTransportationService {
     boolean pickupShift,
     String acceptLanguage,
     String requestId,
+    String areaTimezone,
     List<DrtEstimateItem> items
   ) {
     var io = DrtIoExecutor.getInstance();
@@ -88,7 +92,8 @@ public interface DemandResponsiveTransportationService {
               passengerFareType,
               pickupShift,
               acceptLanguage,
-              requestId
+              requestId,
+              areaTimezone
             ),
           io
         )

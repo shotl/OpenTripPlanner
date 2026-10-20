@@ -354,7 +354,8 @@ public class RoutingWorker {
           request.demandResponsiveExtData().passengerFareType(),
           true,
           request.demandResponsiveExtData().acceptLanguage(),
-          request.demandResponsiveExtData().requestId()
+          request.demandResponsiveExtData().requestId(),
+          request.demandResponsiveExtData().areaTimezone()
         );
 
         if (drtResponse == null) {

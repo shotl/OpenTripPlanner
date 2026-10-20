@@ -131,7 +131,7 @@ class DemandResponsiveTransportationAccessShifterTest {
   }
 
   @Test
-  void testShiftAccessesSendsTheRequestId() {
+  void testShiftAccessesSendsTheRequestIdAndAreaTimezone() {
     var drivingState = TestStateBuilder.ofDriving().streetEdge().streetEdge().build();
     var access = new DefaultAccessEgress(0, drivingState);
     var recording = new TestDemandResponsiveTransportationService();
@@ -144,6 +144,7 @@ class DemandResponsiveTransportationAccessShifterTest {
         .rideType("SHARED")
         .passengers(new Passengers(1, 0))
         .requestId("quote-9")
+        .areaTimezone("Europe/Madrid")
         .build()
     );
 
@@ -156,6 +157,7 @@ class DemandResponsiveTransportationAccessShifterTest {
     );
 
     assertEquals(List.of("quote-9"), recording.requestIds);
+    assertEquals(List.of("Europe/Madrid"), recording.areaTimezones);
   }
 
   @Test

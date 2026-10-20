@@ -60,7 +60,8 @@ public class PerRequestDemandResponsiveTransportationService
     List<PassengerFareType> passengerFareType,
     boolean pickupShift,
     String acceptLanguage,
-    String requestId
+    String requestId,
+    String areaTimezone
   ) {
     var cacheKey = DrtEstimateRequest.create(
       userId,
@@ -102,7 +103,8 @@ public class PerRequestDemandResponsiveTransportationService
       passengerFareType,
       pickupShift,
       acceptLanguage,
-      requestId
+      requestId,
+      areaTimezone
     );
     cache.put(cacheKey, Optional.ofNullable(response));
     return response;
@@ -125,6 +127,7 @@ public class PerRequestDemandResponsiveTransportationService
     boolean pickupShift,
     String acceptLanguage,
     String requestId,
+    String areaTimezone,
     List<DrtEstimateItem> items
   ) {
     var keys = new ArrayList<DrtEstimateRequest>(items.size());
@@ -158,6 +161,7 @@ public class PerRequestDemandResponsiveTransportationService
         pickupShift,
         acceptLanguage,
         requestId,
+        areaTimezone,
         new ArrayList<>(misses.values())
       );
       int k = 0;

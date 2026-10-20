@@ -22,6 +22,9 @@ public class TestDemandResponsiveTransportationService
   /** The request id of every estimate asked, in order. */
   public final List<String> requestIds = new CopyOnWriteArrayList<>();
 
+  /** The area time zone of every estimate asked, in order. */
+  public final List<String> areaTimezones = new CopyOnWriteArrayList<>();
+
   public TestDemandResponsiveTransportationService() {
     this(DEFAULT_ARRIVAL_DELAY);
   }
@@ -45,9 +48,11 @@ public class TestDemandResponsiveTransportationService
     List<PassengerFareType> passengerFareType,
     boolean pickupShift,
     String acceptLanguage,
-    String requestId
+    String requestId,
+    String areaTimezone
   ) {
     requestIds.add(requestId);
+    areaTimezones.add(String.valueOf(areaTimezone));
     // Calculate expected pickup time by adding arrival delay to desired pickup time
     long userExpectedPickupTime = desiredPickupTime.plus(arrivalDelay).getEpochSecond();
     long userExpectedDropoffTime = userExpectedPickupTime + 1800; // 30 minutes trip

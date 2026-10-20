@@ -55,7 +55,8 @@ public abstract class CachingDemandResponsiveTransportationService
     List<PassengerFareType> passengerFareType,
     boolean pickupShift,
     String acceptLanguage,
-    String requestId
+    String requestId,
+    String areaTimezone
   ) {
     LOG.debug(
       "[DRT] API CALL | context={} | areaId={} | from=({},{}) | to=({},{}) | pickupTime={} | " +
@@ -84,7 +85,8 @@ public abstract class CachingDemandResponsiveTransportationService
         passengerFareType,
         pickupShift,
         acceptLanguage,
-        requestId
+        requestId,
+        areaTimezone
       );
 
       LOG.debug(
@@ -137,7 +139,8 @@ public abstract class CachingDemandResponsiveTransportationService
     List<PassengerFareType> passengerFareType,
     boolean pickupShift,
     String acceptLanguage,
-    String requestId
+    String requestId,
+    String areaTimezone
   );
 
   /**
@@ -159,6 +162,7 @@ public abstract class CachingDemandResponsiveTransportationService
     boolean pickupShift,
     String acceptLanguage,
     String requestId,
+    String areaTimezone,
     List<DrtEstimateItem> items
   ) {
     if (items.isEmpty()) {
@@ -177,6 +181,7 @@ public abstract class CachingDemandResponsiveTransportationService
         pickupShift,
         acceptLanguage,
         requestId,
+        areaTimezone,
         items
       );
     }
@@ -193,6 +198,7 @@ public abstract class CachingDemandResponsiveTransportationService
         pickupShift,
         acceptLanguage,
         requestId,
+        areaTimezone,
         items
       );
       LOG.info(
@@ -224,6 +230,7 @@ public abstract class CachingDemandResponsiveTransportationService
         pickupShift,
         acceptLanguage,
         requestId,
+        areaTimezone,
         items
       );
     } catch (Exception e) {
@@ -254,6 +261,7 @@ public abstract class CachingDemandResponsiveTransportationService
     boolean pickupShift,
     String acceptLanguage,
     String requestId,
+    String areaTimezone,
     List<DrtEstimateItem> items
   ) {
     throw new BatchEstimatesUnsupportedException("this provider has no batch estimates");

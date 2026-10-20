@@ -21,13 +21,16 @@ public interface JourneyAvailabilityService {
    * @param desiredTime optional desired pickup/dropoff time (epoch seconds) for time-window filtering
    * @param journeys list of coordinate pairs to check (pickup -> dropoff)
    * @param requestId the caller's request id, sent as {@code X-Request-Id}; null sends none
+   * @param areaTimezone the area's IANA zone, sent with the area id as
+   *                     {@code X-Area-Timezone}; null sends none
    * @return response with availability flags for each journey pair, or null if the service is unavailable
    */
   JourneyAvailabilityResponse checkAvailability(
     String areaId,
     Instant desiredTime,
     List<JourneyAvailabilityService.JourneyPair> journeys,
-    @Nullable String requestId
+    @Nullable String requestId,
+    @Nullable String areaTimezone
   );
 
   /**

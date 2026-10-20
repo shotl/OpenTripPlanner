@@ -759,7 +759,13 @@ public class TransitRouter {
     }
 
     var filter = new JourneyAvailabilityFilter(availabilityService);
-    return filter.filter(stopsByType, drtData.areaId(), request.dateTime(), drtData.requestId());
+    return filter.filter(
+      stopsByType,
+      drtData.areaId(),
+      request.dateTime(),
+      drtData.requestId(),
+      drtData.areaTimezone()
+    );
   }
 
   /**

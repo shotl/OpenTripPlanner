@@ -4145,6 +4145,14 @@ input DRTInput {
   "Area ID for the DRT service."
   areaId: String
   """
+  The IANA time zone of the area (`Europe/Madrid`), sent with `areaId` as the
+  `X-Area-Timezone: <areaId>=<zone>` header on every call OTP makes to the DRT provider for this
+  request, so the provider need not look the zone up. A region id of at most 64 characters of
+  letters, digits and `/` `_` `+` `-`; an offset (`+01:00`) or an unknown zone is ignored, and no
+  header is sent without `areaId`.
+  """
+  areaTimezone: String
+  """
   Minimum buffer time (in seconds) added after transit arrival before requesting DRT pickup
   (egress legs). Protects against the DRT vehicle arriving and leaving before the passenger
   gets off transit and walks to the pickup point. Default 0 (no buffer).

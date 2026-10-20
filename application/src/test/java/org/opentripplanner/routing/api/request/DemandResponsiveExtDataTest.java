@@ -36,6 +36,79 @@ class DemandResponsiveExtDataTest {
     assertNull(DemandResponsiveExtData.validRequestId(null));
   }
 
+  @ParameterizedTest
+  @ValueSource(
+    strings = {
+      "Europe/Madrid",
+      "America/Argentina/Buenos_Aires",
+      "America/Port-au-Prince",
+      "Etc/GMT+1",
+      "UTC",
+    }
+  )
+  void keepsAValidAreaTimezone(String zone) {
+    assertEquals(zone, DemandResponsiveExtData.validAreaTimezone(zone));
+    assertEquals(zone, DemandResponsiveExtData.builder().areaTimezone(zone).build().areaTimezone());
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+    strings = {
+      "",
+      " ",
+      "+01:00",
+      "+01",
+      "-0300",
+      "Z",
+      "GMT+1",
+      "UTC+01:00",
+      "UT+1",
+      "europe/madrid",
+      "Europe/Nowhere",
+      "Europe/Madrid ",
+      "Europe/Madrid\r\nX-Evil: 1",
+      "Europe.Madrid",
+      "Europe/Madrid,Europe/Rome",
+    }
+  )
+  void dropsAnInvalidAreaTimezone(String zone) {
+    assertNull(DemandResponsiveExtData.validAreaTimezone(zone));
+    assertNull(DemandResponsiveExtData.builder().areaTimezone(zone).build().areaTimezone());
+  }
+
+  @Test
+  void dropsAnAreaTimezoneOver64Characters() {
+    assertNull(DemandResponsiveExtData.validAreaTimezone("Europe/" + "A".repeat(58)));
+    assertNull(DemandResponsiveExtData.validAreaTimezone(null));
+  }
+
+  @Test
+  void theAreaTimezoneHeaderIsTheAreaAndItsZone() {
+    assertEquals(
+      "64f0c1d2e3a4b5c6d7e8f901=Europe/Madrid",
+      DemandResponsiveExtData.areaTimezoneHeader("64f0c1d2e3a4b5c6d7e8f901", "Europe/Madrid")
+    );
+    assertNull(DemandResponsiveExtData.areaTimezoneHeader(null, "Europe/Madrid"));
+    assertNull(DemandResponsiveExtData.areaTimezoneHeader("", "Europe/Madrid"));
+    assertNull(DemandResponsiveExtData.areaTimezoneHeader("a=b", "Europe/Madrid"));
+    assertNull(DemandResponsiveExtData.areaTimezoneHeader("area\r\nX: 1", "Europe/Madrid"));
+    assertNull(DemandResponsiveExtData.areaTimezoneHeader("area-1", null));
+    assertNull(DemandResponsiveExtData.areaTimezoneHeader("area-1", "+01:00"));
+  }
+
+  @Test
+  void theAreaTimezoneIsPartOfTheValue() {
+    var a = DemandResponsiveExtData.builder().areaId("x").areaTimezone("Europe/Madrid").build();
+    var b = DemandResponsiveExtData.builder().areaId("x").areaTimezone("Europe/Rome").build();
+
+    assertNotEquals(a, b);
+    assertEquals(
+      a,
+      DemandResponsiveExtData.builder().areaId("x").areaTimezone("Europe/Madrid").build()
+    );
+    assertNull(DemandResponsiveExtData.builder().areaId("x").build().areaTimezone());
+  }
+
   @Test
   void theRequestIdIsPartOfTheValue() {
     var a = DemandResponsiveExtData.builder().areaId("x").requestId("q-1").build();

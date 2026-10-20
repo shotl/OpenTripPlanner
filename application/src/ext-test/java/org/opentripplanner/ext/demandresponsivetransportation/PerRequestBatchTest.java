@@ -22,6 +22,7 @@ class PerRequestBatchTest {
 
     final List<Integer> batchSizes = new ArrayList<>();
     final List<String> requestIds = new ArrayList<>();
+    final List<String> areaTimezones = new ArrayList<>();
     int answered = 0;
 
     @Override
@@ -39,7 +40,8 @@ class PerRequestBatchTest {
       List<PassengerFareType> passengerFareType,
       boolean pickupShift,
       String acceptLanguage,
-      String requestId
+      String requestId,
+      String areaTimezone
     ) {
       throw new AssertionError("the cache must ask in batches");
     }
@@ -57,10 +59,12 @@ class PerRequestBatchTest {
       boolean pickupShift,
       String acceptLanguage,
       String requestId,
+      String areaTimezone,
       List<DrtEstimateItem> items
     ) {
       batchSizes.add(items.size());
       requestIds.add(requestId);
+      areaTimezones.add(areaTimezone);
       var out = new ArrayList<ShotlArrivalEstimateResponse>();
       for (var item : items) {
         int n = answered++;
@@ -114,6 +118,7 @@ class PerRequestBatchTest {
       true,
       "es",
       "req-1",
+      "Europe/Madrid",
       items
     );
   }
@@ -129,6 +134,7 @@ class PerRequestBatchTest {
 
     assertEquals(List.of(2, 1), delegate.batchSizes);
     assertEquals(List.of("req-1", "req-1"), delegate.requestIds, "the id goes on with the misses");
+    assertEquals(List.of("Europe/Madrid", "Europe/Madrid"), delegate.areaTimezones);
     assertEquals("e0", first.get(0).id());
     assertSame(first.get(0), first.get(1));
     assertNull(first.get(2), "a leg without an estimate is remembered as such");

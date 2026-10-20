@@ -60,7 +60,7 @@ public class JourneyAvailabilityFilter {
     String areaId,
     Instant desiredTime
   ) {
-    return filter(Map.of(type, nearbyStops), areaId, desiredTime, null).get(type);
+    return filter(Map.of(type, nearbyStops), areaId, desiredTime, null, null).get(type);
   }
 
   /**
@@ -72,13 +72,16 @@ public class JourneyAvailabilityFilter {
    *
    * @param stopsByType the DRT-eligible stops of each phase
    * @param requestId   the caller's request id, sent as {@code X-Request-Id}; null sends none
+   * @param areaTimezone the area's IANA zone, sent with the area id as
+   *                     {@code X-Area-Timezone}; null sends none
    * @return the filtered stops of every phase given, under the same phase
    */
   public Map<AccessEgressType, Collection<NearbyStop>> filter(
     Map<AccessEgressType, Collection<NearbyStop>> stopsByType,
     String areaId,
     Instant desiredTime,
-    @Nullable String requestId
+    @Nullable String requestId,
+    @Nullable String areaTimezone
   ) {
     var result = new EnumMap<AccessEgressType, Collection<NearbyStop>>(AccessEgressType.class);
     var phases = new ArrayList<Phase>();
@@ -106,7 +109,8 @@ public class JourneyAvailabilityFilter {
       areaId,
       desiredTime,
       journeyPairs,
-      requestId
+      requestId,
+      areaTimezone
     );
 
     // Fail-open: if the service is unavailable, keep all stops
