@@ -16,6 +16,7 @@ import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationService;
 import org.opentripplanner.ext.demandresponsivetransportation.DrtIoExecutor;
+import org.opentripplanner.ext.demandresponsivetransportation.DrtLogContext;
 import org.opentripplanner.ext.demandresponsivetransportation.DrtRequestContext;
 import org.opentripplanner.ext.demandresponsivetransportation.model.DRTLeg;
 import org.opentripplanner.framework.application.OTPFeature;
@@ -117,12 +118,19 @@ public class RoutingWorker {
 
     if (OTPFeature.ParallelRouting.isOn()) {
       // TODO: This is not using {@link OtpRequestThreadFactory} which means we do not get
-      //       log-trace-parameters-propagation and graceful timeout handling here.
+      //       graceful timeout handling here. DrtLogContext carries the log trace parameters
+      //       (the request's correlationId) to the threads.
       try {
         CompletableFuture.allOf(
-          CompletableFuture.runAsync(() -> routeDirectStreet(itineraries, routingErrors)),
-          CompletableFuture.runAsync(() -> routeDirectFlex(itineraries, routingErrors)),
-          CompletableFuture.runAsync(() -> routeTransit(itineraries, routingErrors))
+          CompletableFuture.runAsync(
+            DrtLogContext.withCallerContext(() -> routeDirectStreet(itineraries, routingErrors))
+          ),
+          CompletableFuture.runAsync(
+            DrtLogContext.withCallerContext(() -> routeDirectFlex(itineraries, routingErrors))
+          ),
+          CompletableFuture.runAsync(
+            DrtLogContext.withCallerContext(() -> routeTransit(itineraries, routingErrors))
+          )
         ).join();
       } catch (CompletionException e) {
         RoutingValidationException.unwrapAndRethrowCompletionException(e);
@@ -345,7 +353,8 @@ public class RoutingWorker {
           DrtRequestContext.DIRECT_SHIFTING,
           request.demandResponsiveExtData().passengerFareType(),
           true,
-          request.demandResponsiveExtData().acceptLanguage()
+          request.demandResponsiveExtData().acceptLanguage(),
+          request.demandResponsiveExtData().requestId()
         );
 
         if (drtResponse == null) {

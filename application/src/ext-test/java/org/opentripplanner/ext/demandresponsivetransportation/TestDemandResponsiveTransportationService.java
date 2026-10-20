@@ -3,6 +3,7 @@ package org.opentripplanner.ext.demandresponsivetransportation;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
 import org.opentripplanner.routing.api.request.PassengerFareType;
@@ -17,6 +18,9 @@ public class TestDemandResponsiveTransportationService
   public static final Duration DEFAULT_ARRIVAL_DELAY = Duration.ofMinutes(10);
 
   private final Duration arrivalDelay;
+
+  /** The request id of every estimate asked, in order. */
+  public final List<String> requestIds = new CopyOnWriteArrayList<>();
 
   public TestDemandResponsiveTransportationService() {
     this(DEFAULT_ARRIVAL_DELAY);
@@ -40,8 +44,10 @@ public class TestDemandResponsiveTransportationService
     DrtRequestContext context,
     List<PassengerFareType> passengerFareType,
     boolean pickupShift,
-    String acceptLanguage
+    String acceptLanguage,
+    String requestId
   ) {
+    requestIds.add(requestId);
     // Calculate expected pickup time by adding arrival delay to desired pickup time
     long userExpectedPickupTime = desiredPickupTime.plus(arrivalDelay).getEpochSecond();
     long userExpectedDropoffTime = userExpectedPickupTime + 1800; // 30 minutes trip

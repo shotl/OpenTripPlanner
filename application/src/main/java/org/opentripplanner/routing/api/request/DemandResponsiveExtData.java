@@ -3,6 +3,7 @@ package org.opentripplanner.routing.api.request;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 
 /**
@@ -20,6 +21,12 @@ public class DemandResponsiveExtData implements Serializable {
   public static final int DEFAULT_ACCESS_BUFFER_SECONDS = 0;
   public static final int DEFAULT_EGRESS_BUFFER_SECONDS = 0;
   public static final String DEFAULT_ACCEPT_LANGUAGE = "en_US";
+
+  /** The header the DRT calls of a request carry its {@link #requestId()} in. */
+  public static final String REQUEST_ID_HEADER = "X-Request-Id";
+
+  /** A request id is 1 to 128 characters of letters, digits and {@code . _ : -}. */
+  private static final Pattern REQUEST_ID = Pattern.compile("[A-Za-z0-9._:-]{1,128}");
 
   @Nullable
   private final String paxAppId;
@@ -44,6 +51,9 @@ public class DemandResponsiveExtData implements Serializable {
   private final int egressBufferSeconds;
   private final String acceptLanguage;
   private final boolean finalLegs;
+
+  @Nullable
+  private final String requestId;
 
   public DemandResponsiveExtData(
     @Nullable String paxAppId,
@@ -85,6 +95,36 @@ public class DemandResponsiveExtData implements Serializable {
     @Nullable String acceptLanguage,
     boolean finalLegs
   ) {
+    this(
+      paxAppId,
+      userId,
+      areaId,
+      rideType,
+      passengers,
+      passengerFareType,
+      egressReluctance,
+      accessBufferSeconds,
+      egressBufferSeconds,
+      acceptLanguage,
+      finalLegs,
+      null
+    );
+  }
+
+  public DemandResponsiveExtData(
+    @Nullable String paxAppId,
+    @Nullable String userId,
+    @Nullable String areaId,
+    @Nullable String rideType,
+    @Nullable Passengers passengers,
+    @Nullable List<PassengerFareType> passengerFareType,
+    double egressReluctance,
+    int accessBufferSeconds,
+    int egressBufferSeconds,
+    @Nullable String acceptLanguage,
+    boolean finalLegs,
+    @Nullable String requestId
+  ) {
     this.paxAppId = paxAppId;
     this.userId = userId;
     this.areaId = areaId;
@@ -96,6 +136,16 @@ public class DemandResponsiveExtData implements Serializable {
     this.egressBufferSeconds = egressBufferSeconds;
     this.acceptLanguage = acceptLanguage != null ? acceptLanguage : DEFAULT_ACCEPT_LANGUAGE;
     this.finalLegs = finalLegs;
+    this.requestId = validRequestId(requestId);
+  }
+
+  /**
+   * The request id when it is 1 to 128 characters of letters, digits and {@code . _ : -};
+   * null otherwise, so an invalid id is dropped rather than forwarded.
+   */
+  @Nullable
+  public static String validRequestId(@Nullable String requestId) {
+    return requestId != null && REQUEST_ID.matcher(requestId).matches() ? requestId : null;
   }
 
   /**
@@ -242,6 +292,15 @@ public class DemandResponsiveExtData implements Serializable {
     return finalLegs;
   }
 
+  /**
+   * The caller's request id (the quote's {@code X-Request-Id}), sent as {@link #REQUEST_ID_HEADER}
+   * on every DRT provider call of this request. Null when the caller sent none or an invalid one.
+   */
+  @Nullable
+  public String requestId() {
+    return requestId;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -258,7 +317,8 @@ public class DemandResponsiveExtData implements Serializable {
       accessBufferSeconds == that.accessBufferSeconds &&
       egressBufferSeconds == that.egressBufferSeconds &&
       finalLegs == that.finalLegs &&
-      Objects.equals(acceptLanguage, that.acceptLanguage)
+      Objects.equals(acceptLanguage, that.acceptLanguage) &&
+      Objects.equals(requestId, that.requestId)
     );
   }
 
@@ -275,7 +335,8 @@ public class DemandResponsiveExtData implements Serializable {
       accessBufferSeconds,
       egressBufferSeconds,
       acceptLanguage,
-      finalLegs
+      finalLegs,
+      requestId
     );
   }
 
@@ -310,6 +371,9 @@ public class DemandResponsiveExtData implements Serializable {
       '\'' +
       ", finalLegs=" +
       finalLegs +
+      ", requestId='" +
+      requestId +
+      '\'' +
       '}'
     );
   }
@@ -330,6 +394,7 @@ public class DemandResponsiveExtData implements Serializable {
     private int egressBufferSeconds = DEFAULT_EGRESS_BUFFER_SECONDS;
     private String acceptLanguage;
     private boolean finalLegs;
+    private String requestId;
 
     public Builder paxAppId(String paxAppId) {
       this.paxAppId = paxAppId;
@@ -386,6 +451,11 @@ public class DemandResponsiveExtData implements Serializable {
       return this;
     }
 
+    public Builder requestId(String requestId) {
+      this.requestId = requestId;
+      return this;
+    }
+
     public DemandResponsiveExtData build() {
       return new DemandResponsiveExtData(
         paxAppId,
@@ -398,7 +468,8 @@ public class DemandResponsiveExtData implements Serializable {
         accessBufferSeconds,
         egressBufferSeconds,
         acceptLanguage,
-        finalLegs
+        finalLegs,
+        requestId
       );
     }
   }

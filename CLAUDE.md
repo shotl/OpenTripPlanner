@@ -139,6 +139,7 @@ query {
 | `passengers` | Object | No | 1 regular, 0 wheelchair | Passenger counts |
 | `passengerFareType` | List | No | null | Fare type breakdown for pricing |
 | `egressReluctance` | Float | No | 1.0 | Multiplier to inflate CAR egress cost before Raptor |
+| `requestId` | String | No | null | Caller's request id (1..128 of `[A-Za-z0-9._:-]`, else ignored), sent as `X-Request-Id` on every rides and areas call |
 
 ### Mode Combinations
 
@@ -577,6 +578,20 @@ Access shifting and leg decoration ask for their legs in batches (`POST {baseUrl
 | `LEG_DECORATING` | Post-Raptor, in DecorateWithDRT filter | Replace car legs with real DRT data |
 | `DIRECT_SHIFTING` | After direct street routing | Replace direct car legs with real DRT data |
 
+### Request id and journey availability
+
+- `drt.requestId` (read from the raw `drt` argument in `RouteRequestMapper`, kept in
+  `DemandResponsiveExtData.requestId()`) goes out as `X-Request-Id` on the rides estimate calls
+  (single and batch) and on the areas `POST /journey-availability` call. Without it no header is sent.
+- With `server.traceParameters` (see Configuration) the inbound `X-Request-Id` header is the
+  `correlationId` log key (`%X{correlationId}` in `logback.xml`) and is echoed on the response.
+  `DrtLogContext` copies the caller's MDC to the DRT I/O pool and to the parallel-routing threads.
+- When access and egress are both DRT, `TransitRouter` runs both street searches, makes **one**
+  journey-availability call with the access journeys then the egress journeys, splits the answers
+  back by position (`JourneyAvailabilityFilter.filter(Map, ...)`), then shifts each phase. A failed
+  call or an answer of the wrong size leaves both phases unfiltered (fail-open). With one DRT phase
+  the phase calls on its own, as before.
+
 ---
 
 ## 9. Cost Calculation (Generalized Cost)
@@ -913,6 +928,17 @@ Note: the leg `mode` remains `"CAR"` even for DRT legs. The presence of `drtEsti
 }
 ```
 
+Request tracing (`server.traceParameters`, upstream OTP) is on in every `config/*/router-config.json`:
+
+```json
+"server": {
+  "traceParameters": [
+    { "httpRequestHeader": "X-Request-Id", "httpResponseHeader": "X-Request-Id",
+      "logKey": "correlationId", "generateIdIfMissing": false }
+  ]
+}
+```
+
 ### HTTP Client Configuration
 
 The Dagger module (`DemandResponsiveTransportationServicesModule`) creates a shared HTTP client with:
@@ -1105,6 +1131,8 @@ Phase 2 - Access Shifting:
 | `ext/demandresponsivetransportation/service/shotl/ShotlApiResponse.java` | Raw Shotl API response wrapper |
 | `ext/demandresponsivetransportation/service/shotl/ShotlBusinessRejectionException.java` | Exception for Shotl business rejections |
 | `ext/demandresponsivetransportation/DrtIoExecutor.java` | Shared I/O thread pool (20 threads) for concurrent Shotl API calls |
+| `ext/demandresponsivetransportation/DrtLogContext.java` | Carries the caller's log MDC (`correlationId`) to DRT worker threads |
+| `ext/demandresponsivetransportation/JourneyAvailabilityFilter.java` | Pre-filters DRT stops with the areas journey-availability call (one call for access + egress) |
 | `ext/demandresponsivetransportation/DrtEstimateRequest.java` | Cache key (rounded coords + time) |
 | `ext/demandresponsivetransportation/DrtRequestContext.java` | Enum: ACCESS_SHIFTING, EGRESS_SHIFTING, LEG_DECORATING, DIRECT_SHIFTING |
 | `ext/demandresponsivetransportation/DrtStopsModule.java` | Graph build: loads drt_stops.txt, reports each stop's car reach |

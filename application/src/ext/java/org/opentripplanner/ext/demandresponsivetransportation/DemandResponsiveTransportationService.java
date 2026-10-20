@@ -27,6 +27,7 @@ public interface DemandResponsiveTransportationService {
    * @param passengerFareType optional passenger fare types for pricing calculation
    * @param pickupShift whether this is a pickup shift request (true for egress decoration)
    * @param acceptLanguage Accept-Language header value to forward to the DRT provider
+   * @param requestId the caller's request id, sent as {@code X-Request-Id}; null sends none
    */
   ShotlArrivalEstimateResponse arrivalTimes(
     String paxAppId,
@@ -41,7 +42,8 @@ public interface DemandResponsiveTransportationService {
     DrtRequestContext context,
     List<PassengerFareType> passengerFareType,
     boolean pickupShift,
-    String acceptLanguage
+    String acceptLanguage,
+    String requestId
   );
 
   /**
@@ -63,6 +65,7 @@ public interface DemandResponsiveTransportationService {
     List<PassengerFareType> passengerFareType,
     boolean pickupShift,
     String acceptLanguage,
+    String requestId,
     List<DrtEstimateItem> items
   ) {
     var io = DrtIoExecutor.getInstance();
@@ -84,7 +87,8 @@ public interface DemandResponsiveTransportationService {
               context,
               passengerFareType,
               pickupShift,
-              acceptLanguage
+              acceptLanguage,
+              requestId
             ),
           io
         )

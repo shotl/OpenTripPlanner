@@ -14,6 +14,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -39,6 +40,8 @@ class ShotlServiceBatchTest {
   private final AtomicInteger batchCalls = new AtomicInteger();
   private final AtomicInteger singleCalls = new AtomicInteger();
   private final AtomicReference<JsonNode> lastBatch = new AtomicReference<>();
+  private final List<String> batchRequestIds = new CopyOnWriteArrayList<>();
+  private final List<String> singleRequestIds = new CopyOnWriteArrayList<>();
 
   @AfterEach
   void stop() {
@@ -51,6 +54,7 @@ class ShotlServiceBatchTest {
     server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
     server.createContext("/v3/drt/time-estimations/batch", exchange -> {
       batchCalls.incrementAndGet();
+      batchRequestIds.add(String.valueOf(exchange.getRequestHeaders().getFirst("X-Request-Id")));
       lastBatch.set(MAPPER.readTree(exchange.getRequestBody()));
       var bytes = batchBody.getBytes(StandardCharsets.UTF_8);
       exchange.sendResponseHeaders(batchStatus, bytes.length);
@@ -62,6 +66,7 @@ class ShotlServiceBatchTest {
         return;
       }
       singleCalls.incrementAndGet();
+      singleRequestIds.add(String.valueOf(exchange.getRequestHeaders().getFirst("X-Request-Id")));
       var bytes =
         ("{\"success\":true,\"data\":" + estimate("single") + "}").getBytes(StandardCharsets.UTF_8);
       exchange.sendResponseHeaders(200, bytes.length);
@@ -98,6 +103,10 @@ class ShotlServiceBatchTest {
   }
 
   private static List<ShotlArrivalEstimateResponse> batch(ShotlService s, int n) {
+    return batch(s, n, "quote-1");
+  }
+
+  private static List<ShotlArrivalEstimateResponse> batch(ShotlService s, int n, String requestId) {
     return s.arrivalTimesBatch(
       "app-1",
       "area-1",
@@ -109,7 +118,27 @@ class ShotlServiceBatchTest {
       List.of(new PassengerFareType("REGULAR", 1)),
       true,
       "es",
+      requestId,
       items(n)
+    );
+  }
+
+  private static ShotlArrivalEstimateResponse single(ShotlService s, String requestId) {
+    return s.arrivalTimes(
+      "app-1",
+      "area-1",
+      "user-1",
+      "RIDE_NOW",
+      new WgsCoordinate(41.38, 2.17),
+      new WgsCoordinate(41.40, 2.18),
+      1,
+      0,
+      AT,
+      DrtRequestContext.DIRECT_SHIFTING,
+      List.of(),
+      true,
+      "es",
+      requestId
     );
   }
 
@@ -155,6 +184,37 @@ class ShotlServiceBatchTest {
     assertEquals(3, answers.size());
     assertNotNull(answers.get(0));
     assertEquals(2, again.size());
+    assertEquals(List.of("quote-1"), batchRequestIds);
+    assertEquals(5, singleRequestIds.size());
+    singleRequestIds.forEach(id -> assertEquals("quote-1", id, "leg by leg keeps the id"));
+  }
+
+  @Test
+  void sendsTheRequestIdOnTheBatchCall() throws IOException {
+    var service = start(200, "{\"success\":true,\"data\":{\"results\":[]}}");
+
+    batch(service, 2, "quote-1:a_b.c-d");
+
+    assertEquals(List.of("quote-1:a_b.c-d"), batchRequestIds);
+  }
+
+  @Test
+  void sendsNoRequestIdOnTheBatchCallWithoutOne() throws IOException {
+    var service = start(200, "{\"success\":true,\"data\":{\"results\":[]}}");
+
+    batch(service, 2, null);
+
+    assertEquals(List.of("null"), batchRequestIds, "no X-Request-Id header");
+  }
+
+  @Test
+  void sendsTheRequestIdOnASingleCallAndNoneWithoutOne() throws IOException {
+    var service = start(200, "{}");
+
+    assertNotNull(single(service, "quote-2"));
+    assertNotNull(single(service, null));
+
+    assertEquals(List.of("quote-2", "null"), singleRequestIds);
   }
 
   @Test

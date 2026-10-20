@@ -11,6 +11,7 @@ import graphql.schema.DataFetchingEnvironment;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.opentripplanner.apis.gtfs.GraphQLRequestContext;
 import org.opentripplanner.apis.gtfs.generated.GraphQLTypes;
 import org.opentripplanner.framework.graphql.GraphQLUtils;
@@ -75,9 +76,20 @@ public class RouteRequestMapper {
     // sadly we need to use the raw collection because it is cast to the wrong type
     mapViaPoints(request, environment.getArgument("via"));
 
-    setDrtInput(request, args.getGraphQLDrt());
+    setDrtInput(request, args.getGraphQLDrt(), drtRequestId(environment));
 
     return request;
+  }
+
+  /**
+   * {@code drt.requestId}, read from the raw argument like {@code via}: the generated GraphQLTypes
+   * of the DRT input are maintained by hand in this fork, and regenerating them would rewrite the
+   * other DRT fields.
+   */
+  @Nullable
+  static String drtRequestId(DataFetchingEnvironment environment) {
+    Map<String, Object> drt = environment.getArgument("drt");
+    return drt != null && drt.get("requestId") instanceof String requestId ? requestId : null;
   }
 
   private static void setPreferences(
@@ -197,7 +209,11 @@ public class RouteRequestMapper {
     request.setViaLocations(ViaLocationMapper.mapToViaLocations(via));
   }
 
-  private static void setDrtInput(RouteRequest request, GraphQLTypes.GraphQLDrtInput drtInput) {
+  private static void setDrtInput(
+    RouteRequest request,
+    GraphQLTypes.GraphQLDrtInput drtInput,
+    @Nullable String requestId
+  ) {
     // Check if drtInput has meaningful data (not just an empty object from the code generator)
     if (drtInput == null || !hasDrtData(drtInput)) {
       return;
@@ -234,7 +250,8 @@ public class RouteRequestMapper {
       accessBufferSeconds,
       egressBufferSeconds,
       request.locale() != null ? request.locale().toLanguageTag() : null,
-      Boolean.TRUE.equals(drtInput.getGraphQLFinalLegs())
+      Boolean.TRUE.equals(drtInput.getGraphQLFinalLegs()),
+      requestId
     );
     LOG.info("[DRT] GraphQL DRT input parsed: {}", extData);
     request.setDemandResponsiveExtData(extData);

@@ -1,6 +1,7 @@
 package org.opentripplanner.ext.demandresponsivetransportation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.opentripplanner.routing.algorithm.raptoradapter.router.street.AccessEgressType.ACCESS;
 import static org.opentripplanner.routing.algorithm.raptoradapter.router.street.AccessEgressType.EGRESS;
@@ -9,6 +10,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
@@ -112,7 +114,8 @@ class JourneyAvailabilityFilterTest {
       public JourneyAvailabilityResponse checkAvailability(
         String areaId,
         Instant desiredTime,
-        List<JourneyPair> journeys
+        List<JourneyPair> journeys,
+        String requestId
       ) {
         return null;
       }
@@ -205,6 +208,132 @@ class JourneyAvailabilityFilterTest {
   }
 
   @Test
+  void oneCallForAccessAndEgressSplitsTheAnswersPerPhase() {
+    // Access A, B, C then egress A, B: A and C reachable on access, only B on egress.
+    var capturingService = new CapturingJourneyAvailabilityService(
+      List.of(true, false, true, false, true)
+    );
+    var filter = new JourneyAvailabilityFilter(capturingService);
+
+    var result = filter.filter(
+      Map.of(
+        EGRESS,
+        createEgressNearbyStops(stopA, stopB),
+        ACCESS,
+        createAccessNearbyStops(stopA, stopB, stopC)
+      ),
+      AREA_ID,
+      DESIRED_TIME,
+      "quote-1"
+    );
+
+    assertEquals(1, capturingService.calls, "one call for both phases");
+    assertEquals("quote-1", capturingService.capturedRequestId);
+    var pairs = capturingService.capturedJourneys;
+    assertEquals(5, pairs.size());
+    // The access journeys come first (path origin -> stop), then the egress ones (stop -> path origin)
+    assertEquals(PATH_ORIGIN_LAT, pairs.get(0).pickup().latitude(), 0.0001);
+    assertEquals(stopC.getLat(), pairs.get(2).dropoff().latitude(), 0.0001);
+    assertEquals(stopA.getLat(), pairs.get(3).pickup().latitude(), 0.0001);
+    assertEquals(PATH_DEST_LAT, pairs.get(4).dropoff().latitude(), 0.0001);
+    assertEquals(Set.of("STOP_A", "STOP_C"), stopIds(result.get(ACCESS)));
+    assertEquals(Set.of("STOP_B"), stopIds(result.get(EGRESS)));
+  }
+
+  @Test
+  void oneCallGivesEachPhaseWhatItsOwnCallGives() {
+    // The areas service answers by journey: only journeys touching STOP_B are unavailable.
+    JourneyAvailabilityService byStop = (areaId, desiredTime, journeys, requestId) ->
+      new JourneyAvailabilityResponse(
+        journeys
+          .stream()
+          .map(j -> {
+            boolean touchesB =
+              Math.abs(j.pickup().latitude() - stopB.getLat()) < 1e-9 ||
+              Math.abs(j.dropoff().latitude() - stopB.getLat()) < 1e-9;
+            return new JourneyAvailabilityResponse.JourneyResult(!touchesB, "", "", 0, 0, 0, 0);
+          })
+          .toList()
+      );
+    var filter = new JourneyAvailabilityFilter(byStop);
+    var access = createAccessNearbyStops(stopA, stopB, stopC);
+    var egress = createEgressNearbyStops(stopB, stopC);
+
+    var merged = filter.filter(Map.of(ACCESS, access, EGRESS, egress), AREA_ID, DESIRED_TIME, null);
+
+    assertEquals(
+      stopIds(filter.filter(access, ACCESS, AREA_ID, DESIRED_TIME)),
+      stopIds(merged.get(ACCESS))
+    );
+    assertEquals(
+      stopIds(filter.filter(egress, EGRESS, AREA_ID, DESIRED_TIME)),
+      stopIds(merged.get(EGRESS))
+    );
+    assertEquals(Set.of("STOP_A", "STOP_C"), stopIds(merged.get(ACCESS)));
+    assertEquals(Set.of("STOP_C"), stopIds(merged.get(EGRESS)));
+  }
+
+  @Test
+  void oneCallThatFailsKeepsEveryPhase() {
+    JourneyAvailabilityService failing = (areaId, desiredTime, journeys, requestId) -> null;
+    var filter = new JourneyAvailabilityFilter(failing);
+    var access = createAccessNearbyStops(stopA, stopB);
+    var egress = createEgressNearbyStops(stopC);
+
+    var result = filter.filter(Map.of(ACCESS, access, EGRESS, egress), AREA_ID, DESIRED_TIME, null);
+
+    assertSame(access, result.get(ACCESS));
+    assertSame(egress, result.get(EGRESS));
+  }
+
+  @Test
+  void oneCallWithAnAnswerOfTheWrongSizeKeepsEveryPhase() {
+    var filter = new JourneyAvailabilityFilter(mockService(List.of(false, false)));
+    var access = createAccessNearbyStops(stopA, stopB);
+    var egress = createEgressNearbyStops(stopC);
+
+    var result = filter.filter(Map.of(ACCESS, access, EGRESS, egress), AREA_ID, DESIRED_TIME, null);
+
+    assertSame(access, result.get(ACCESS));
+    assertSame(egress, result.get(EGRESS));
+  }
+
+  @Test
+  void aPhaseWithNothingToCheckStaysOutOfTheCall() {
+    var capturingService = new CapturingJourneyAvailabilityService(List.of(false));
+    var filter = new JourneyAvailabilityFilter(capturingService);
+    List<NearbyStop> egress = List.of(new NearbyStop(stopB, 100, null, null));
+
+    var result = filter.filter(
+      Map.of(ACCESS, createAccessNearbyStops(stopA), EGRESS, egress),
+      AREA_ID,
+      DESIRED_TIME,
+      null
+    );
+
+    assertEquals(1, capturingService.capturedJourneys.size(), "only the access journey");
+    assertTrue(result.get(ACCESS).isEmpty());
+    assertSame(egress, result.get(EGRESS));
+  }
+
+  @Test
+  void noCallWhenNoPhaseHasAnythingToCheck() {
+    var capturingService = new CapturingJourneyAvailabilityService(List.of());
+    var filter = new JourneyAvailabilityFilter(capturingService);
+
+    var result = filter.filter(
+      Map.of(ACCESS, List.of(), EGRESS, List.of()),
+      AREA_ID,
+      DESIRED_TIME,
+      null
+    );
+
+    assertEquals(0, capturingService.calls);
+    assertTrue(result.get(ACCESS).isEmpty());
+    assertTrue(result.get(EGRESS).isEmpty());
+  }
+
+  @Test
   void extractPathOriginCoordinateReturnsNullForNullState() {
     var result = JourneyAvailabilityFilter.extractPathOriginCoordinate(null);
     assertEquals(null, result);
@@ -228,7 +357,7 @@ class JourneyAvailabilityFilterTest {
   // --- helpers ---
 
   private JourneyAvailabilityService mockService(List<Boolean> availabilities) {
-    return (areaId, desiredTime, journeys) -> {
+    return (areaId, desiredTime, journeys, requestId) -> {
       var results = new ArrayList<JourneyAvailabilityResponse.JourneyResult>();
       for (int i = 0; i < availabilities.size(); i++) {
         results.add(
@@ -299,6 +428,8 @@ class JourneyAvailabilityFilterTest {
 
     final List<Boolean> responses;
     List<JourneyPair> capturedJourneys;
+    String capturedRequestId;
+    int calls;
 
     CapturingJourneyAvailabilityService(List<Boolean> responses) {
       this.responses = responses;
@@ -308,9 +439,12 @@ class JourneyAvailabilityFilterTest {
     public JourneyAvailabilityResponse checkAvailability(
       String areaId,
       Instant desiredTime,
-      List<JourneyPair> journeys
+      List<JourneyPair> journeys,
+      String requestId
     ) {
       this.capturedJourneys = journeys;
+      this.capturedRequestId = requestId;
+      this.calls++;
       var results = new ArrayList<JourneyAvailabilityResponse.JourneyResult>();
       for (int i = 0; i < journeys.size(); i++) {
         boolean available = i < responses.size() && responses.get(i);

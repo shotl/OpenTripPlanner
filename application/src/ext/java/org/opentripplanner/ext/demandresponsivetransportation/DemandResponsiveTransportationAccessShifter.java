@@ -109,6 +109,7 @@ public class DemandResponsiveTransportationAccessShifter {
           ext.passengerFareType(),
           true,
           ext.acceptLanguage(),
+          ext.requestId(),
           items
         );
       for (int i = 0; i < keys.size(); i++) {
@@ -230,7 +231,8 @@ public class DemandResponsiveTransportationAccessShifter {
       isAccess ? DrtRequestContext.ACCESS_SHIFTING : DrtRequestContext.EGRESS_SHIFTING,
       req.demandResponsiveExtData().passengerFareType(),
       true,
-      req.demandResponsiveExtData().acceptLanguage()
+      req.demandResponsiveExtData().acceptLanguage(),
+      req.demandResponsiveExtData().requestId()
     );
     return shiftFrom(desiredPickupTime, drtEstimationResponse, fromCoordinate, toCoordinate);
   }

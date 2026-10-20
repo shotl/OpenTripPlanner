@@ -54,7 +54,8 @@ public abstract class CachingDemandResponsiveTransportationService
     DrtRequestContext context,
     List<PassengerFareType> passengerFareType,
     boolean pickupShift,
-    String acceptLanguage
+    String acceptLanguage,
+    String requestId
   ) {
     LOG.debug(
       "[DRT] API CALL | context={} | areaId={} | from=({},{}) | to=({},{}) | pickupTime={} | " +
@@ -82,7 +83,8 @@ public abstract class CachingDemandResponsiveTransportationService
         context,
         passengerFareType,
         pickupShift,
-        acceptLanguage
+        acceptLanguage,
+        requestId
       );
 
       LOG.debug(
@@ -134,7 +136,8 @@ public abstract class CachingDemandResponsiveTransportationService
     DrtRequestContext context,
     List<PassengerFareType> passengerFareType,
     boolean pickupShift,
-    String acceptLanguage
+    String acceptLanguage,
+    String requestId
   );
 
   /**
@@ -155,6 +158,7 @@ public abstract class CachingDemandResponsiveTransportationService
     List<PassengerFareType> passengerFareType,
     boolean pickupShift,
     String acceptLanguage,
+    String requestId,
     List<DrtEstimateItem> items
   ) {
     if (items.isEmpty()) {
@@ -172,6 +176,7 @@ public abstract class CachingDemandResponsiveTransportationService
         passengerFareType,
         pickupShift,
         acceptLanguage,
+        requestId,
         items
       );
     }
@@ -187,6 +192,7 @@ public abstract class CachingDemandResponsiveTransportationService
         passengerFareType,
         pickupShift,
         acceptLanguage,
+        requestId,
         items
       );
       LOG.info(
@@ -217,6 +223,7 @@ public abstract class CachingDemandResponsiveTransportationService
         passengerFareType,
         pickupShift,
         acceptLanguage,
+        requestId,
         items
       );
     } catch (Exception e) {
@@ -246,6 +253,7 @@ public abstract class CachingDemandResponsiveTransportationService
     List<PassengerFareType> passengerFareType,
     boolean pickupShift,
     String acceptLanguage,
+    String requestId,
     List<DrtEstimateItem> items
   ) {
     throw new BatchEstimatesUnsupportedException("this provider has no batch estimates");

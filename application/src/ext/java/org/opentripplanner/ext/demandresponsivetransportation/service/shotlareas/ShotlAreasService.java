@@ -8,9 +8,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.opentripplanner.ext.demandresponsivetransportation.JourneyAvailabilityService;
 import org.opentripplanner.framework.io.OtpHttpClient;
 import org.opentripplanner.framework.json.ObjectMappers;
+import org.opentripplanner.routing.api.request.DemandResponsiveExtData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +55,8 @@ public class ShotlAreasService implements JourneyAvailabilityService {
   public JourneyAvailabilityResponse checkAvailability(
     String areaId,
     Instant desiredTime,
-    List<JourneyPair> journeys
+    List<JourneyPair> journeys,
+    @Nullable String requestId
   ) {
     var uri = UriBuilder.fromUri(journeyAvailabilityUri).build();
 
@@ -90,7 +93,7 @@ public class ShotlAreasService implements JourneyAvailabilityService {
         uri,
         jsonBody,
         API_TIMEOUT,
-        Map.of(CONTENT_TYPE, "application/json"),
+        headers(requestId),
         is -> {
           try {
             return MAPPER.readValue(is, JourneyAvailabilityResponse.class);
@@ -128,5 +131,17 @@ public class ShotlAreasService implements JourneyAvailabilityService {
       // skip filtering and proceed with all stops (fail-open behavior)
       return null;
     }
+  }
+
+  /** The headers of a call to areas; X-Request-Id only when the request has an id. */
+  static Map<String, String> headers(@Nullable String requestId) {
+    return requestId == null
+      ? Map.of(CONTENT_TYPE, "application/json")
+      : Map.of(
+        CONTENT_TYPE,
+        "application/json",
+        DemandResponsiveExtData.REQUEST_ID_HEADER,
+        requestId
+      );
   }
 }

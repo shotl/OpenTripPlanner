@@ -4173,6 +4173,12 @@ input DRTInput {
   passengers: DRTPassengersInput
   "passenger app id"
   paxAppId: String
+  """
+  The caller's request id, sent as the `X-Request-Id` header on every call OTP makes to the DRT
+  provider for this request, so one id follows the request across services. 1 to 128 characters
+  of letters, digits and `.` `_` `:` `-`; any other value is ignored.
+  """
+  requestId: String
   "Type of ride requested."
   rideType: String
   "User ID for the DRT service."

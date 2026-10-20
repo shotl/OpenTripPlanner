@@ -129,6 +129,7 @@ public class DecorateWithDRT implements ItineraryListFilter {
       extData.passengerFareType(),
       true,
       extData.acceptLanguage(),
+      extData.requestId(),
       requested.stream().map(p -> new DrtEstimateItem(p.from(), p.to(), p.pickupTime())).toList()
     );
     var fetched = new LinkedHashMap<FetchParams, ShotlArrivalEstimateResponse>();
