@@ -6,11 +6,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.ws.rs.core.UriBuilder;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.opentripplanner.ext.demandresponsivetransportation.JourneyAvailabilityService;
 import org.opentripplanner.framework.io.OtpHttpClient;
 import org.opentripplanner.framework.json.ObjectMappers;
+import org.opentripplanner.routing.api.request.DemandResponsiveExtData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +56,9 @@ public class ShotlAreasService implements JourneyAvailabilityService {
   public JourneyAvailabilityResponse checkAvailability(
     String areaId,
     Instant desiredTime,
-    List<JourneyPair> journeys
+    List<JourneyPair> journeys,
+    @Nullable String requestId,
+    @Nullable String areaTimezone
   ) {
     var uri = UriBuilder.fromUri(journeyAvailabilityUri).build();
 
@@ -90,7 +95,7 @@ public class ShotlAreasService implements JourneyAvailabilityService {
         uri,
         jsonBody,
         API_TIMEOUT,
-        Map.of(CONTENT_TYPE, "application/json"),
+        headers(requestId, areaId, areaTimezone),
         is -> {
           try {
             return MAPPER.readValue(is, JourneyAvailabilityResponse.class);
@@ -128,5 +133,26 @@ public class ShotlAreasService implements JourneyAvailabilityService {
       // skip filtering and proceed with all stops (fail-open behavior)
       return null;
     }
+  }
+
+  /**
+   * The headers of a call to areas; X-Request-Id only when the request has an id, X-Area-Timezone
+   * only when it has both an area and its zone.
+   */
+  static Map<String, String> headers(
+    @Nullable String requestId,
+    @Nullable String areaId,
+    @Nullable String areaTimezone
+  ) {
+    var headers = new HashMap<String, String>();
+    headers.put(CONTENT_TYPE, "application/json");
+    if (requestId != null) {
+      headers.put(DemandResponsiveExtData.REQUEST_ID_HEADER, requestId);
+    }
+    var zone = DemandResponsiveExtData.areaTimezoneHeader(areaId, areaTimezone);
+    if (zone != null) {
+      headers.put(DemandResponsiveExtData.AREA_TIMEZONE_HEADER, zone);
+    }
+    return Map.copyOf(headers);
   }
 }

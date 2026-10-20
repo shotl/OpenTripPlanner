@@ -8,6 +8,16 @@
             "providerName": "Shotl"
         }
     ],
+    "server": {
+        "traceParameters": [
+            {
+                "httpRequestHeader": "X-Request-Id",
+                "httpResponseHeader": "X-Request-Id",
+                "logKey": "correlationId",
+                "generateIdIfMissing": false
+            }
+        ]
+    },
     "routingDefaults": {
         "accessEgress": {
             "maxStopCountForMode": {

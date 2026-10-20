@@ -1,6 +1,8 @@
 package org.opentripplanner.ext.demandresponsivetransportation;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -57,7 +59,9 @@ public class PerRequestDemandResponsiveTransportationService
     DrtRequestContext context,
     List<PassengerFareType> passengerFareType,
     boolean pickupShift,
-    String acceptLanguage
+    String acceptLanguage,
+    String requestId,
+    String areaTimezone
   ) {
     var cacheKey = DrtEstimateRequest.create(
       userId,
@@ -98,9 +102,86 @@ public class PerRequestDemandResponsiveTransportationService
       context,
       passengerFareType,
       pickupShift,
-      acceptLanguage
+      acceptLanguage,
+      requestId,
+      areaTimezone
     );
     cache.put(cacheKey, Optional.ofNullable(response));
     return response;
+  }
+
+  /**
+   * Answers the cached legs from the cache and sends only the misses on as one batch; legs that
+   * round to the same key cost one estimate.
+   */
+  @Override
+  public List<ShotlArrivalEstimateResponse> arrivalTimesBatch(
+    String paxAppId,
+    String areaId,
+    String userId,
+    String rideType,
+    int regularPassengers,
+    int wheelchairPassengers,
+    DrtRequestContext context,
+    List<PassengerFareType> passengerFareType,
+    boolean pickupShift,
+    String acceptLanguage,
+    String requestId,
+    String areaTimezone,
+    List<DrtEstimateItem> items
+  ) {
+    var keys = new ArrayList<DrtEstimateRequest>(items.size());
+    var misses = new LinkedHashMap<DrtEstimateRequest, DrtEstimateItem>();
+    for (var item : items) {
+      var key = DrtEstimateRequest.create(
+        userId,
+        areaId,
+        rideType,
+        item.from(),
+        item.to(),
+        regularPassengers,
+        wheelchairPassengers,
+        item.pickupTime()
+      );
+      keys.add(key);
+      if (!cache.containsKey(key)) {
+        misses.putIfAbsent(key, item);
+      }
+    }
+    if (!misses.isEmpty()) {
+      var answers = delegate.arrivalTimesBatch(
+        paxAppId,
+        areaId,
+        userId,
+        rideType,
+        regularPassengers,
+        wheelchairPassengers,
+        context,
+        passengerFareType,
+        pickupShift,
+        acceptLanguage,
+        requestId,
+        areaTimezone,
+        new ArrayList<>(misses.values())
+      );
+      int k = 0;
+      for (var key : misses.keySet()) {
+        var answer = k < answers.size() ? answers.get(k) : null;
+        cache.put(key, Optional.ofNullable(answer));
+        k++;
+      }
+    }
+    LOG.debug(
+      "[DRT] BATCH CACHE | context={} | items={} | sent={}",
+      context,
+      items.size(),
+      misses.size()
+    );
+    var out = new ArrayList<ShotlArrivalEstimateResponse>(items.size());
+    for (var key : keys) {
+      var cached = cache.get(key);
+      out.add(cached != null ? cached.orElse(null) : null);
+    }
+    return out;
   }
 }

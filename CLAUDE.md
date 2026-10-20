@@ -139,6 +139,8 @@ query {
 | `passengers` | Object | No | 1 regular, 0 wheelchair | Passenger counts |
 | `passengerFareType` | List | No | null | Fare type breakdown for pricing |
 | `egressReluctance` | Float | No | 1.0 | Multiplier to inflate CAR egress cost before Raptor |
+| `requestId` | String | No | null | Caller's request id (1..128 of `[A-Za-z0-9._:-]`, else ignored), sent as `X-Request-Id` on every rides and areas call |
+| `areaTimezone` | String | No | null | IANA zone of the area (`Europe/Madrid`; a region id of at most 64 of `[A-Za-z0-9/_+-]` that `ZoneId.of` knows, offsets and unknown zones ignored), sent as `X-Area-Timezone: <areaId>=<zone>` on every rides and areas call |
 
 ### Mode Combinations
 
@@ -424,6 +426,16 @@ This ensures the itinerary's total cost accurately reflects the real DRT data fo
 
 ---
 
+### Final legs (`drt: { finalLegs: true }`)
+
+A caller that sends `finalLegs` gets the itinerary it books, built from the provider's estimate (`DrtFinalLegs`, run at the end of `DecorateWithDRT`):
+
+- estimates are asked from the passenger's point and the transit stop (access: origin → the stop it boards; egress: the stop it alights at → destination), so `pickup_walking_seconds` / `dropoff_walking_seconds` cover the whole walk;
+- every DRT leg becomes **walk → DRT → walk**: the DRT leg (still `CAR` with `drtEstimate`) runs from the scheduled pickup place to the scheduled dropoff place at the vehicle's times, with the provider's names; each walk keeps its real duration (left out only when zero) and replaces the street walks around the car leg;
+- connections are checked with the real times and no slack: an access must reach the stop `accessBufferSeconds` before it departs, an egress passenger must reach the pickup `egressBufferSeconds` before the vehicle; otherwise the itinerary is removed (the 2 min egress tolerance applies only without `finalLegs`).
+
+Without `finalLegs` (older callers) nothing changes.
+
 ## 7. Phase 5: Direct DRT (Door-to-Door)
 
 ### How It Works
@@ -556,6 +568,8 @@ HTTP timeout: **60 seconds**.
 
 When Shotl returns `success: false`, a `ShotlBusinessRejectionException` is thrown, caught by the service layer, and the itinerary is flagged for deletion (no DRT available for that leg).
 
+Access shifting and leg decoration ask for their legs in batches (`POST {baseUrl}/v3/drt/time-estimations/batch`, see 20.4.5); a rejected item is treated exactly like a single rejection.
+
 ### When the API Is Called (4 Contexts)
 
 | Context | When | Purpose |
@@ -564,6 +578,26 @@ When Shotl returns `success: false`, a `ShotlBusinessRejectionException` is thro
 | `EGRESS_SHIFTING` | Pre-Raptor, for egress legs | (Currently unused; egress handled in decoration) |
 | `LEG_DECORATING` | Post-Raptor, in DecorateWithDRT filter | Replace car legs with real DRT data |
 | `DIRECT_SHIFTING` | After direct street routing | Replace direct car legs with real DRT data |
+
+### Request id, area time zone and journey availability
+
+- `drt.requestId` (read from the raw `drt` argument in `RouteRequestMapper`, kept in
+  `DemandResponsiveExtData.requestId()`) goes out as `X-Request-Id` on the rides estimate calls
+  (single and batch, and leg by leg when rides has no batch route) and on the areas
+  `POST /journey-availability` call. Without it no header is sent.
+- `drt.areaTimezone` takes the same path (raw argument, `DemandResponsiveExtData.areaTimezone()`,
+  validated by `validAreaTimezone`: a region id `ZoneId.of` knows whose id is its own name, so
+  `+01:00`, `Z` and `GMT+1` are dropped) and goes out on the same calls as
+  `X-Area-Timezone: <areaId>=<zone>` (`DemandResponsiveExtData.areaTimezoneHeader`). No header
+  without a zone, or without an `areaId` of 1..128 of `[A-Za-z0-9._:-]`.
+- With `server.traceParameters` (see Configuration) the inbound `X-Request-Id` header is the
+  `correlationId` log key (`%X{correlationId}` in `logback.xml`) and is echoed on the response.
+  `DrtLogContext` copies the caller's MDC to the DRT I/O pool and to the parallel-routing threads.
+- When access and egress are both DRT, `TransitRouter` runs both street searches, makes **one**
+  journey-availability call with the access journeys then the egress journeys, splits the answers
+  back by position (`JourneyAvailabilityFilter.filter(Map, ...)`), then shifts each phase. A failed
+  call or an answer of the wrong size leaves both phases unfiltered (fail-open). With one DRT phase
+  the phase calls on its own, as before.
 
 ---
 
@@ -784,36 +818,28 @@ This reduces API calls while ensuring all platforms in a station are reachable.
 
 ### Build-Time Validation
 
-During graph build, `DrtStopsModule.validateDrivableStreetLinks()` checks every DRT-eligible stop
-and logs a detailed multi-line diagnostic for each problematic one. Three problem classes:
+The DRT street search never drives into a stop: like a car pick-up it drives to a street, the
+passenger leaves the vehicle and walks to the stop (access), or walks from the stop to where the
+vehicle waits (egress). Stations and most bus stops are linked to footways, platforms or
+sidewalks, so whether the stop's own link allows cars says nothing about DRT.
 
-- **No street vertex**: the stop was never linked to the street network at all
-- **Not car-reachable, MITIGATED**: no incoming car-traversable street link, but a sibling stop in
-  the same parent station is DRT-eligible + car-reachable + has a walk transfer to this stop, so
-  the runtime sibling-expansion feature will still serve it (this is why DRT can "work" for stops
-  that are flagged)
-- **Not car-reachable, NOT MITIGATED**: no sibling fallback exists — the stop will never be served
-  by DRT access
+During graph build, `DrtStopsModule.validateDrivableStreetLinks()` measures, for every
+DRT-eligible stop, the walk on this graph's streets to the nearest **car point** — a street
+vertex a car can both drive into and out of (`DrtStopCarReach`, a Dijkstra over walkable edges
+that never passes through another stop), in both directions (car point → stop for access, stop →
+car point for egress):
 
-Each warning includes:
+- one INFO summary: stops within 50 m, within 150 m, farther (up to 500 m), with no car point
+  within 500 m (never served by DRT), and without a street vertex;
+- one WARN line per stop farther than 150 m, with both walks and the car point's coordinates (where
+  the vehicle would stop: place the virtual stop by that road, or fix the stop's linking in OSM);
+- one WARN line per stop with no car point within 500 m or no street vertex.
 
-- **GTFS stop data**: id, name, code, platform code, description, vehicle type, wheelchair
-  accessibility, coordinates, parent station and its child stop count
-- **Street linkage cause analysis** (mirrors `TransitStopVertex.isReachableByCarForAccess()`):
-  which street vertex the stop is linked to (OSM node id from the loaded OSM data + coordinates),
-  its distance from the stop, every incoming street edge with name/permission/length/car speed and
-  its endpoint node ids/coordinates, and a classification of the root cause — no street→stop link,
-  isolated street vertex, ONE-WAY street pointing away (cars can leave but not arrive), or
-  pedestrian/bicycle-only area. Also reports whether car egress and walk linkage work. All data
-  comes from the graph built from the configured (custom) OSM extract — no external OSM URLs or
-  services are referenced.
-- **DRT impact**: MITIGATED (lists the sibling stops + walk transfer distances that will serve
-  this stop) or NOT MITIGATED. Siblings that are car-reachable but lack a walk transfer are listed
-  separately as near-misses.
-
-A summary INFO line reports totals: directly reachable / mitigated / not mitigated / missing
-vertex. The sibling check is exact because `DrtStopsModule` runs after `DirectTransferGenerator`
-in the graph build pipeline, so walk path transfers are already available.
+Barcelona (2026-10-19, local graph): of 159 FGC/Rodalies DRT stops, 101 are within 50 m, 50
+within 150 m and 8 at 152–181 m; none unreachable. A TMB test set added La Sagrera `3:1.930`
+(L9/L10), linked to an isolated path (the walk reaches 3 points) although a road is 4 m away:
+DRT can never serve it until its linking/OSM is fixed. When a stop is unreachable, the warning
+says how many street points the walk reached (few = isolated path).
 
 ---
 
@@ -906,6 +932,17 @@ Note: the leg `mode` remains `"CAR"` even for DRT legs. The presence of `drtEsti
       "minTransitDuration": "4m"
     }
   }
+}
+```
+
+Request tracing (`server.traceParameters`, upstream OTP) is on in every `config/*/router-config.json`:
+
+```json
+"server": {
+  "traceParameters": [
+    { "httpRequestHeader": "X-Request-Id", "httpResponseHeader": "X-Request-Id",
+      "logKey": "correlationId", "generateIdIfMissing": false }
+  ]
 }
 ```
 
@@ -1101,9 +1138,12 @@ Phase 2 - Access Shifting:
 | `ext/demandresponsivetransportation/service/shotl/ShotlApiResponse.java` | Raw Shotl API response wrapper |
 | `ext/demandresponsivetransportation/service/shotl/ShotlBusinessRejectionException.java` | Exception for Shotl business rejections |
 | `ext/demandresponsivetransportation/DrtIoExecutor.java` | Shared I/O thread pool (20 threads) for concurrent Shotl API calls |
+| `ext/demandresponsivetransportation/DrtLogContext.java` | Carries the caller's log MDC (`correlationId`) to DRT worker threads |
+| `ext/demandresponsivetransportation/JourneyAvailabilityFilter.java` | Pre-filters DRT stops with the areas journey-availability call (one call for access + egress) |
 | `ext/demandresponsivetransportation/DrtEstimateRequest.java` | Cache key (rounded coords + time) |
 | `ext/demandresponsivetransportation/DrtRequestContext.java` | Enum: ACCESS_SHIFTING, EGRESS_SHIFTING, LEG_DECORATING, DIRECT_SHIFTING |
-| `ext/demandresponsivetransportation/DrtStopsModule.java` | Graph build: loads drt_stops.txt |
+| `ext/demandresponsivetransportation/DrtStopsModule.java` | Graph build: loads drt_stops.txt, reports each stop's car reach |
+| `ext/demandresponsivetransportation/DrtStopCarReach.java` | Walk from a DRT stop to the nearest point a vehicle can drive in and out of |
 | `ext/demandresponsivetransportation/DrtStopsDataReader.java` | Reads drt_stops.txt from GTFS feeds |
 | `ext/demandresponsivetransportation/DemandResponsiveTransportationServiceParameters.java` | Config record: enabled, estimationsURL, providerName |
 | `ext/demandresponsivetransportation/configure/DemandResponsiveTransportationServicesModule.java` | Dagger DI module with HTTP client setup |
@@ -1411,26 +1451,14 @@ One concern is that Shotl estimates contain an `id` field that may be used for b
 
 **Implemented**: All three `parallelStream()` levels in `DecorateWithDRT` and the `parallelStream()` in `DemandResponsiveTransportationAccessShifter` have been replaced with `CompletableFuture.supplyAsync()` using the shared `DrtIoExecutor` thread pool (20 I/O threads). The innermost `parallelStream()` on legs was replaced with a sequential `stream()` since itineraries typically have only 1-2 car legs. This eliminates the `ForkJoinPool` bottleneck that caused all Shotl API calls to run sequentially on single-core deployments.
 
-#### 20.4.5 Shotl API Batch Endpoint (High Impact, High Effort)
+#### 20.4.5 Shotl API Batch Endpoint — IMPLEMENTED
 
-**Current**: Each leg generates one independent HTTP POST to `v3/drt/time-estimations`. 16-50 calls per routing request means 16-50 HTTP round-trips with TCP overhead, serialization/deserialization, and server-side processing.
+**Implemented** (docker-compose `docs/features/intermodal-batch-estimates.md`): access shifting sends every unique access estimate in **one** `POST v3/drt/time-estimations/batch`, and `DecorateWithDRT` sends every unique leg in a second one, so a search makes two calls instead of 16-50. The request carries the shared fields once (`area_id`, `user_id`, `ride_type`, `passengers`, `passenger_fare_type`, `pickup_shift`) and `items[{key, desired_pickup_location, desired_dropoff_location, desired_pickup_time}]`; the answer is `{success, data: {results: [{key, success, data | reason}]}}`, mapped back by key (a missing key or a rejection is `null`, as a single call would be).
 
-**Suggestion**: If the Shotl API supports (or could support) a batch endpoint, send all estimation requests in a single HTTP call:
-
-```json
-POST v3/drt/time-estimations/batch
-{
-  "estimates": [
-    { "from": {...}, "to": {...}, "desired_pickup_time": 1706965200 },
-    { "from": {...}, "to": {...}, "desired_pickup_time": 1706965500 },
-    ...
-  ]
-}
-```
-
-This would reduce HTTP overhead dramatically: 1 round-trip instead of 16-50, and the Shotl backend could optimize internal routing for nearby requests.
-
-**Effort**: Requires changes on the Shotl API side (new endpoint) and on the OTP side (collect all estimation requests, batch them, distribute responses back to callers).
+- `DemandResponsiveTransportationService.arrivalTimesBatch` has a default that asks leg by leg on `DrtIoExecutor`, so other providers and the test stub keep working.
+- `PerRequestDemandResponsiveTransportationService` answers cached legs itself and sends only its misses, once per rounded key.
+- `CachingDemandResponsiveTransportationService`: a 404/405 from rides (no batch route yet) falls back to single calls and tries batches again 10 minutes later; any other batch failure leaves every leg of that phase without an estimate (no retry leg by leg). `OTP_DRT_BATCH_ESTIMATIONS=false` in the environment turns batches off.
+- The direct DRT shift stays single (one leg).
 
 #### 20.4.6 Eagerly Filter Unreachable Stops Before API Calls (Low-Medium Impact, Low Effort)
 

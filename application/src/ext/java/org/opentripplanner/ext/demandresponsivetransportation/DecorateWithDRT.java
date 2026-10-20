@@ -10,8 +10,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 import org.opentripplanner.ext.demandresponsivetransportation.model.DRTLeg;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
@@ -93,14 +91,18 @@ public class DecorateWithDRT implements ItineraryListFilter {
           var pickupTime = isEgress
             ? leg.getStartTime().toInstant().plusSeconds(egressBufferSeconds)
             : request.dateTime();
-          var key = new FetchParams(leg.getFrom().coordinate, leg.getTo().coordinate, pickupTime);
+          var key = fetchParams(leg, itinerary.getLegs(), isEgress, pickupTime);
           uniqueRequests.putIfAbsent(key, key);
         }
       }
     }
 
     if (uniqueRequests.isEmpty()) {
-      return itineraries;
+      // Nothing left to estimate, but legs the access shifting already estimated still
+      // become the final legs.
+      return finalLegs()
+        ? itineraries.stream().map(i -> applyEstimates(i, Map.of())).toList()
+        : itineraries;
     }
 
     LOG.info(
@@ -109,38 +111,37 @@ public class DecorateWithDRT implements ItineraryListFilter {
       uniqueRequests.size()
     );
 
-    // Phase 2: Fetch unique estimates concurrently on the I/O thread pool
-    ExecutorService io = DrtIoExecutor.getInstance();
-    var futures = new LinkedHashMap<FetchParams, CompletableFuture<ShotlArrivalEstimateResponse>>();
-    for (var params : uniqueRequests.keySet()) {
-      futures.put(
-        params,
-        CompletableFuture.supplyAsync(
-          () ->
-            service.arrivalTimes(
-              extData.paxAppId(),
-              extData.areaId(),
-              extData.userId(),
-              extData.rideType(),
-              params.from(),
-              params.to(),
-              extData.passengers().regular(),
-              extData.passengers().wheelchair(),
-              params.pickupTime(),
-              DrtRequestContext.LEG_DECORATING,
-              extData.passengerFareType(),
-              true,
-              extData.acceptLanguage()
-            ),
-          io
-        )
-      );
+    if (extData == null) {
+      // Without the DRT request data no leg can be estimated (this used to throw).
+      return itineraries;
+    }
+
+    // Phase 2: Fetch every unique estimate in one batch
+    var requested = new ArrayList<>(uniqueRequests.keySet());
+    var responses = service.arrivalTimesBatch(
+      extData.paxAppId(),
+      extData.areaId(),
+      extData.userId(),
+      extData.rideType(),
+      extData.passengers().regular(),
+      extData.passengers().wheelchair(),
+      DrtRequestContext.LEG_DECORATING,
+      extData.passengerFareType(),
+      true,
+      extData.acceptLanguage(),
+      extData.requestId(),
+      extData.areaTimezone(),
+      requested.stream().map(p -> new DrtEstimateItem(p.from(), p.to(), p.pickupTime())).toList()
+    );
+    var fetched = new LinkedHashMap<FetchParams, ShotlArrivalEstimateResponse>();
+    for (int i = 0; i < requested.size(); i++) {
+      fetched.put(requested.get(i), i < responses.size() ? responses.get(i) : null);
     }
 
     var estimates = new HashMap<FetchParams, ShotlArrivalEstimateResponse>();
-    for (var entry : futures.entrySet()) {
+    for (var entry : fetched.entrySet()) {
       var params = entry.getKey();
-      var response = entry.getValue().join();
+      var response = entry.getValue();
       estimates.put(params, response);
       if (response != null) {
         long walkToPickup = response.pickup_walking_seconds() != null
@@ -186,6 +187,23 @@ public class DecorateWithDRT implements ItineraryListFilter {
       var fixedLegs = fixTemporalOverlaps(decoratedLegs);
       updateEgressGeneralizedCost(i, allLegs, fixedLegs);
       i.setLegs(fixedLegs);
+      if (finalLegs()) {
+        var extData = request.demandResponsiveExtData();
+        var finals = DrtFinalLegs.build(
+          fixedLegs,
+          extData.accessBufferSeconds(),
+          extData.egressBufferSeconds(),
+          request.preferences().walk().reluctance()
+        );
+        if (finals.isEmpty()) {
+          LOG.info(
+            "[DRT] itinerary removed: a DRT leg cannot make its connection with the real times"
+          );
+          flagForDeletion(i);
+        } else {
+          i.setLegs(finals.get());
+        }
+      }
     }
 
     return i;
@@ -211,7 +229,7 @@ public class DecorateWithDRT implements ItineraryListFilter {
     var pickupTime = isEgress
       ? leg.getStartTime().toInstant().plusSeconds(egressBuffer)
       : request.dateTime();
-    var key = new FetchParams(leg.getFrom().coordinate, leg.getTo().coordinate, pickupTime);
+    var key = fetchParams(leg, allLegs, isEgress, pickupTime);
 
     var drtEstimationResponse = estimates.get(key);
 
@@ -229,7 +247,7 @@ public class DecorateWithDRT implements ItineraryListFilter {
       return leg;
     }
 
-    if (isTemporallyInfeasible(leg, allLegs, drtEstimationResponse, isEgress)) {
+    if (!finalLegs() && isTemporallyInfeasible(leg, allLegs, drtEstimationResponse, isEgress)) {
       flagForDeletion(i);
       return leg;
     }
@@ -277,6 +295,47 @@ public class DecorateWithDRT implements ItineraryListFilter {
     );
 
     return drtLeg;
+  }
+
+  private boolean finalLegs() {
+    var extData = request.demandResponsiveExtData();
+    return extData != null && extData.finalLegs();
+  }
+
+  /**
+   * The points a car leg's estimate is asked for. The final legs ask from the passenger's point
+   * and the transit stop (the access from the origin to the stop it boards, the egress from the
+   * stop it alights at to the destination), so the provider's walking seconds cover the whole
+   * walk; older callers get the car leg's own ends.
+   */
+  private FetchParams fetchParams(Leg leg, List<Leg> legs, boolean isEgress, Instant pickupTime) {
+    if (!finalLegs()) {
+      return new FetchParams(leg.getFrom().coordinate, leg.getTo().coordinate, pickupTime);
+    }
+    int index = legs.indexOf(leg);
+    WgsCoordinate from;
+    WgsCoordinate to;
+    if (isEgress) {
+      from = leg.getFrom().coordinate;
+      for (int j = index - 1; j >= 0; j--) {
+        if (legs.get(j).isTransitLeg()) {
+          from = legs.get(j).getTo().coordinate;
+          break;
+        }
+      }
+      to = legs.get(legs.size() - 1).getTo().coordinate;
+    } else {
+      from = legs.get(0).getFrom().coordinate;
+      to = leg.getTo().coordinate;
+      for (int j = index + 1; j < legs.size(); j++) {
+        if (legs.get(j).isTransitLeg()) {
+          to = legs.get(j).getFrom().coordinate;
+          break;
+        }
+        to = legs.get(j).getTo().coordinate;
+      }
+    }
+    return new FetchParams(from, to, pickupTime);
   }
 
   private static void flagForDeletion(Itinerary i) {
