@@ -33,6 +33,6 @@ oauth2-proxy:
   resources:
     requests:
       cpu: 10m
-      memory: 20Mi
+      memory: 16Mi # ~8Mi peak (2026-11, ADR 0012)
     limits:
-      memory: 40Mi
+      memory: 80Mi
