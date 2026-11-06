@@ -9,10 +9,11 @@ app:
   scheduling:
     preferSpotInstances: true
 
-  # Other pods in the same node might suffer when otp-server is starting
+  # The limit leaves 1Gi above the 3G heap (see production/values.yaml). Requests from 2 weeks
+  # of staging (2026-11, ~1.1Gi peak; ADR 0012).
   resources:
     limits:
-      memory: 3Gi
+      memory: 4Gi
     requests:
-      cpu: 250m
-      memory: 2Gi
+      cpu: 10m
+      memory: 1392Mi
