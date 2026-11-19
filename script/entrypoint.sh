@@ -202,7 +202,16 @@ MAX_MEMORY="${MAX_MEMORY:-2}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"
 MOUNT_PATH="${MOUNT_PATH:-"/app/build"}"
 
-if [[ $ACTION == "build" ]]; then
+# OTP_SKIP_S3_DOWNLOAD=true (docker-compose): work on the files already in MOUNT_PATH, never talk to S3.
+SKIP_S3="${OTP_SKIP_S3_DOWNLOAD:-false}"
+
+if [[ $ACTION == "build" && "$SKIP_S3" == "true" ]]; then
+  log "INFO" "OTP_SKIP_S3_DOWNLOAD=true: building from the OSM/GTFS/config files in /${MOUNT_PATH} (no download, no upload)"
+  cd "/${MOUNT_PATH}"
+  java -Xmx"${MAX_MEMORY}"G ${EXTRA_ARGS} -jar /app/otp-shaded.jar --build --save .
+  log "INFO" "Graph saved to /${MOUNT_PATH}/graph.obj"
+  exit 0
+elif [[ $ACTION == "build" ]]; then
   log "INFO" "downloading OSM data from s3://${S3_BUCKET}/${OSM_DIR}/${ENVIRONMENT}/${OSM_FILE_NAME}.osm.pbf"
   aws_retry aws s3 cp s3://${S3_BUCKET}/${OSM_DIR}/${ENVIRONMENT}/${OSM_FILE_NAME}.osm.pbf ${OSM_FILE_NAME}.osm.pbf
 
@@ -221,8 +230,16 @@ if [[ $ACTION == "build" ]]; then
   log "INFO" "Build uploaded to s3://${S3_BUCKET}/${OTP_DIR}/${ENVIRONMENT}"
   exit 0
 elif [[ $ACTION == "serve" ]]; then
-  log "INFO" "downloading build from s3://${S3_BUCKET}/${OTP_DIR}/$ENVIRONMENT/graph.obj"
-  aws_retry aws s3 cp s3://${S3_BUCKET}/${OTP_DIR}/${ENVIRONMENT}/graph.obj /${MOUNT_PATH}/graph.obj
+  if [[ "$SKIP_S3" == "true" ]]; then
+    log "INFO" "OTP_SKIP_S3_DOWNLOAD=true: serving the local graph /${MOUNT_PATH}/graph.obj"
+    if [[ ! -s "/${MOUNT_PATH}/graph.obj" ]]; then
+      log "ERROR" "no graph.obj in /${MOUNT_PATH}: mount a directory holding one, or run the 'build' command first"
+      exit 1
+    fi
+  else
+    log "INFO" "downloading build from s3://${S3_BUCKET}/${OTP_DIR}/$ENVIRONMENT/graph.obj"
+    aws_retry aws s3 cp s3://${S3_BUCKET}/${OTP_DIR}/${ENVIRONMENT}/graph.obj /${MOUNT_PATH}/graph.obj
+  fi
 
   log "INFO" "Copying config files from ${CONFIG_FILES_PATH} to build working directory"
   cp ${CONFIG_FILES_PATH}/* /${MOUNT_PATH}/. || log "WARNING" "no config files were found in ${CONFIG_FILES_PATH}"
