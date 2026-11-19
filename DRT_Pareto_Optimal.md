@@ -127,6 +127,11 @@ When a bus stops 100 meters from the destination every 10 minutes, there is no r
 
 ## The Role of `AccessEgressPenaltyDecorator`
 
+> **Note:** DRT is excluded from the car access/egress penalty:
+> `AccessEgressPreferences.createDefaultCarPenalty()` skips
+> `StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION`, so by default a DRT access or egress gets no time
+> or cost penalty. The DRT figures below assume a penalty of `20m + 2.0 t` with cost factor 1.5.
+
 Before RAPTOR runs, OTP applies penalties to non-walk access/egress via `AccessEgressPenaltyDecorator`. The penalties are defined per `StreetMode` and consist of two components:
 
 ### Penalty Formula
