@@ -10,12 +10,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationAccessAdapter;
 import org.opentripplanner.ext.demandresponsivetransportation.DemandResponsiveTransportationAccessShifter;
+import org.opentripplanner.ext.demandresponsivetransportation.DrtLogContext;
 import org.opentripplanner.ext.demandresponsivetransportation.JourneyAvailabilityFilter;
 import org.opentripplanner.ext.ridehailing.RideHailingAccessShifter;
 import org.opentripplanner.framework.application.OTPFeature;
@@ -224,13 +226,19 @@ public class TransitRouter {
     final var accessList = new ArrayList<RoutingAccessEgress>();
     final var egressList = new ArrayList<RoutingAccessEgress>();
 
-    if (OTPFeature.ParallelRouting.isOn()) {
+    if (joinsJourneyAvailability()) {
+      fetchDrtAccessEgressesWithOneAvailabilityCall(accessList, egressList);
+    } else if (OTPFeature.ParallelRouting.isOn()) {
       try {
         // TODO: This is not using {@link OtpRequestThreadFactory} which mean we do not get
-        //       log-trace-parameters-propagation and graceful timeout handling here.
+        //       graceful timeout handling here. DrtLogContext carries the log trace parameters.
         CompletableFuture.allOf(
-          CompletableFuture.runAsync(() -> accessList.addAll(fetchAccess())),
-          CompletableFuture.runAsync(() -> egressList.addAll(fetchEgress()))
+          CompletableFuture.runAsync(
+            DrtLogContext.withCallerContext(() -> accessList.addAll(fetchAccess()))
+          ),
+          CompletableFuture.runAsync(
+            DrtLogContext.withCallerContext(() -> egressList.addAll(fetchEgress()))
+          )
         ).join();
       } catch (CompletionException e) {
         RoutingValidationException.unwrapAndRethrowCompletionException(e);
@@ -269,7 +277,109 @@ public class TransitRouter {
     return list;
   }
 
+  /**
+   * Whether access and egress are both DRT and their stops are checked for journey availability:
+   * then the two phases share one journey-availability call, made once both street searches have
+   * their DRT stops. With one DRT phase (or no check) each phase runs on its own as before.
+   */
+  private boolean joinsJourneyAvailability() {
+    var drtData = request.demandResponsiveExtData();
+    return (
+      request.journey().access().mode() == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION &&
+      request.journey().egress().mode() == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION &&
+      serverContext.journeyAvailabilityService() != null &&
+      drtData != null &&
+      drtData.areaId() != null
+    );
+  }
+
+  /**
+   * Access and egress when both are DRT: the two street searches (in parallel with parallel
+   * routing), one journey-availability call for the DRT stops of both, then the rest of each
+   * phase (shifting, sibling stops, walk fallback) on the stops that call kept. Each phase gets
+   * exactly what {@link #fetchAccessEgresses(AccessEgressType)} would give it.
+   */
+  private void fetchDrtAccessEgressesWithOneAvailabilityCall(
+    List<RoutingAccessEgress> accessList,
+    List<RoutingAccessEgress> egressList
+  ) {
+    debugTimingAggregator.startedAccessCalculating();
+    debugTimingAggregator.startedEgressCalculating();
+    StreetCandidates access;
+    StreetCandidates egress;
+    if (OTPFeature.ParallelRouting.isOn()) {
+      var accessSearch = CompletableFuture.supplyAsync(
+        DrtLogContext.supplierWithCallerContext(() -> findStreetCandidates(ACCESS))
+      );
+      var egressSearch = CompletableFuture.supplyAsync(
+        DrtLogContext.supplierWithCallerContext(() -> findStreetCandidates(EGRESS))
+      );
+      try {
+        CompletableFuture.allOf(accessSearch, egressSearch).join();
+      } catch (CompletionException e) {
+        RoutingValidationException.unwrapAndRethrowCompletionException(e);
+      }
+      access = accessSearch.join();
+      egress = egressSearch.join();
+    } else {
+      access = findStreetCandidates(ACCESS);
+      egress = findStreetCandidates(EGRESS);
+    }
+
+    var available = filterByJourneyAvailability(
+      Map.of(ACCESS, access.nearbyStops(), EGRESS, egress.nearbyStops())
+    );
+
+    Runnable completeAccess = () -> {
+      accessList.addAll(completeAccessEgresses(access, available.get(ACCESS)));
+      debugTimingAggregator.finishedAccessCalculating();
+    };
+    Runnable completeEgress = () -> {
+      egressList.addAll(completeAccessEgresses(egress, available.get(EGRESS)));
+      debugTimingAggregator.finishedEgressCalculating();
+    };
+    if (OTPFeature.ParallelRouting.isOn()) {
+      try {
+        CompletableFuture.allOf(
+          CompletableFuture.runAsync(DrtLogContext.withCallerContext(completeAccess)),
+          CompletableFuture.runAsync(DrtLogContext.withCallerContext(completeEgress))
+        ).join();
+      } catch (CompletionException e) {
+        RoutingValidationException.unwrapAndRethrowCompletionException(e);
+      }
+    } else {
+      completeAccess.run();
+      completeEgress.run();
+    }
+  }
+
+  /**
+   * What the street search of one phase found: the request and preferences it ran with, and the
+   * stops it reached (for DRT, only the DRT-eligible ones).
+   */
+  private record StreetCandidates(
+    AccessEgressType type,
+    RouteRequest accessRequest,
+    StreetRequest streetRequest,
+    AccessEgressPreferences accessEgressPreferences,
+    Collection<NearbyStop> nearbyStops
+  ) {}
+
   private Collection<? extends RoutingAccessEgress> fetchAccessEgresses(AccessEgressType type) {
+    var candidates = findStreetCandidates(type);
+    var nearbyStops = candidates.nearbyStops();
+    if (candidates.streetRequest().mode() == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION) {
+      // Pre-filter by journey availability: call the areas service to check
+      // which origin->stop (access) or stop->destination (egress) journeys
+      // can actually be served by the DRT provider. This avoids expensive
+      // Shotl rides API calls and unnecessary Raptor paths for infeasible journeys.
+      nearbyStops = filterByJourneyAvailability(Map.of(type, nearbyStops)).get(type);
+    }
+    return completeAccessEgresses(candidates, nearbyStops);
+  }
+
+  /** The street search of one phase, up to its DRT-eligible stops. */
+  private StreetCandidates findStreetCandidates(AccessEgressType type) {
     var streetRequest = type.isAccess() ? request.journey().access() : request.journey().egress();
     StreetMode mode = streetRequest.mode();
 
@@ -339,13 +449,30 @@ public class TransitRouter {
     // Walk-accessible stops are added separately below and are NOT filtered.
     if (mode == StreetMode.DEMAND_RESPONSIVE_TRANSPORTATION) {
       nearbyStops = filterDrtEligibleStops(nearbyStops, type);
-
-      // Pre-filter by journey availability: call the areas service to check
-      // which origin->stop (access) or stop->destination (egress) journeys
-      // can actually be served by the DRT provider. This avoids expensive
-      // Shotl rides API calls and unnecessary Raptor paths for infeasible journeys.
-      nearbyStops = filterByJourneyAvailability(nearbyStops, type);
     }
+
+    return new StreetCandidates(
+      type,
+      accessRequest,
+      streetRequest,
+      accessEgressPreferences,
+      nearbyStops
+    );
+  }
+
+  /**
+   * The rest of one phase once its stops are known: mapping, DRT shifting, sibling stops, the
+   * walk fallback and flex.
+   */
+  private Collection<? extends RoutingAccessEgress> completeAccessEgresses(
+    StreetCandidates candidates,
+    Collection<NearbyStop> nearbyStops
+  ) {
+    var type = candidates.type();
+    var accessRequest = candidates.accessRequest();
+    var streetRequest = candidates.streetRequest();
+    var accessEgressPreferences = candidates.accessEgressPreferences();
+    StreetMode mode = streetRequest.mode();
 
     var accessEgresses = AccessEgressMapper.mapNearbyStops(nearbyStops, type);
 
@@ -615,23 +742,30 @@ public class TransitRouter {
    * <p>
    * Uses fail-open behavior: if the service is not configured or unavailable, all stops
    * pass through unfiltered.
+   * <p>
+   * The stops of every phase given (access, egress or both) are checked in one call.
    */
-  private Collection<NearbyStop> filterByJourneyAvailability(
-    Collection<NearbyStop> nearbyStops,
-    AccessEgressType type
+  private Map<AccessEgressType, Collection<NearbyStop>> filterByJourneyAvailability(
+    Map<AccessEgressType, Collection<NearbyStop>> stopsByType
   ) {
     var availabilityService = serverContext.journeyAvailabilityService();
     if (availabilityService == null) {
-      return nearbyStops;
+      return stopsByType;
     }
 
     var drtData = request.demandResponsiveExtData();
     if (drtData == null || drtData.areaId() == null) {
-      return nearbyStops;
+      return stopsByType;
     }
 
     var filter = new JourneyAvailabilityFilter(availabilityService);
-    return filter.filter(nearbyStops, type, drtData.areaId(), request.dateTime());
+    return filter.filter(
+      stopsByType,
+      drtData.areaId(),
+      request.dateTime(),
+      drtData.requestId(),
+      drtData.areaTimezone()
+    );
   }
 
   /**

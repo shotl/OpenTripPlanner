@@ -1,8 +1,12 @@
 package org.opentripplanner.routing.api.request;
 
 import java.io.Serializable;
+import java.time.DateTimeException;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 
 /**
@@ -20,6 +24,21 @@ public class DemandResponsiveExtData implements Serializable {
   public static final int DEFAULT_ACCESS_BUFFER_SECONDS = 0;
   public static final int DEFAULT_EGRESS_BUFFER_SECONDS = 0;
   public static final String DEFAULT_ACCEPT_LANGUAGE = "en_US";
+
+  /** The header the DRT calls of a request carry its {@link #requestId()} in. */
+  public static final String REQUEST_ID_HEADER = "X-Request-Id";
+
+  /** A request id is 1 to 128 characters of letters, digits and {@code . _ : -}. */
+  private static final Pattern REQUEST_ID = Pattern.compile("[A-Za-z0-9._:-]{1,128}");
+
+  /** The header the DRT calls of a request carry {@code <areaId>=<areaTimezone>} in. */
+  public static final String AREA_TIMEZONE_HEADER = "X-Area-Timezone";
+
+  /** An area id goes in the area time zone header only as 1 to 128 of {@code [A-Za-z0-9._:-]}. */
+  private static final Pattern AREA_ID = REQUEST_ID;
+
+  /** An area time zone is 1 to 64 characters of letters, digits and {@code / _ + -}. */
+  private static final Pattern AREA_TIMEZONE = Pattern.compile("[A-Za-z0-9/_+-]{1,64}");
 
   @Nullable
   private final String paxAppId;
@@ -43,6 +62,13 @@ public class DemandResponsiveExtData implements Serializable {
   private final int accessBufferSeconds;
   private final int egressBufferSeconds;
   private final String acceptLanguage;
+  private final boolean finalLegs;
+
+  @Nullable
+  private final String requestId;
+
+  @Nullable
+  private final String areaTimezone;
 
   public DemandResponsiveExtData(
     @Nullable String paxAppId,
@@ -56,6 +82,96 @@ public class DemandResponsiveExtData implements Serializable {
     int egressBufferSeconds,
     @Nullable String acceptLanguage
   ) {
+    this(
+      paxAppId,
+      userId,
+      areaId,
+      rideType,
+      passengers,
+      passengerFareType,
+      egressReluctance,
+      accessBufferSeconds,
+      egressBufferSeconds,
+      acceptLanguage,
+      false
+    );
+  }
+
+  public DemandResponsiveExtData(
+    @Nullable String paxAppId,
+    @Nullable String userId,
+    @Nullable String areaId,
+    @Nullable String rideType,
+    @Nullable Passengers passengers,
+    @Nullable List<PassengerFareType> passengerFareType,
+    double egressReluctance,
+    int accessBufferSeconds,
+    int egressBufferSeconds,
+    @Nullable String acceptLanguage,
+    boolean finalLegs
+  ) {
+    this(
+      paxAppId,
+      userId,
+      areaId,
+      rideType,
+      passengers,
+      passengerFareType,
+      egressReluctance,
+      accessBufferSeconds,
+      egressBufferSeconds,
+      acceptLanguage,
+      finalLegs,
+      null
+    );
+  }
+
+  public DemandResponsiveExtData(
+    @Nullable String paxAppId,
+    @Nullable String userId,
+    @Nullable String areaId,
+    @Nullable String rideType,
+    @Nullable Passengers passengers,
+    @Nullable List<PassengerFareType> passengerFareType,
+    double egressReluctance,
+    int accessBufferSeconds,
+    int egressBufferSeconds,
+    @Nullable String acceptLanguage,
+    boolean finalLegs,
+    @Nullable String requestId
+  ) {
+    this(
+      paxAppId,
+      userId,
+      areaId,
+      rideType,
+      passengers,
+      passengerFareType,
+      egressReluctance,
+      accessBufferSeconds,
+      egressBufferSeconds,
+      acceptLanguage,
+      finalLegs,
+      requestId,
+      null
+    );
+  }
+
+  public DemandResponsiveExtData(
+    @Nullable String paxAppId,
+    @Nullable String userId,
+    @Nullable String areaId,
+    @Nullable String rideType,
+    @Nullable Passengers passengers,
+    @Nullable List<PassengerFareType> passengerFareType,
+    double egressReluctance,
+    int accessBufferSeconds,
+    int egressBufferSeconds,
+    @Nullable String acceptLanguage,
+    boolean finalLegs,
+    @Nullable String requestId,
+    @Nullable String areaTimezone
+  ) {
     this.paxAppId = paxAppId;
     this.userId = userId;
     this.areaId = areaId;
@@ -66,6 +182,51 @@ public class DemandResponsiveExtData implements Serializable {
     this.accessBufferSeconds = accessBufferSeconds;
     this.egressBufferSeconds = egressBufferSeconds;
     this.acceptLanguage = acceptLanguage != null ? acceptLanguage : DEFAULT_ACCEPT_LANGUAGE;
+    this.finalLegs = finalLegs;
+    this.requestId = validRequestId(requestId);
+    this.areaTimezone = validAreaTimezone(areaTimezone);
+  }
+
+  /**
+   * The request id when it is 1 to 128 characters of letters, digits and {@code . _ : -};
+   * null otherwise, so an invalid id is dropped rather than forwarded.
+   */
+  @Nullable
+  public static String validRequestId(@Nullable String requestId) {
+    return requestId != null && REQUEST_ID.matcher(requestId).matches() ? requestId : null;
+  }
+
+  /**
+   * The zone when it is an IANA region id ({@code Europe/Madrid}, {@code UTC}) of at most 64
+   * characters of letters, digits and {@code / _ + -} that {@link ZoneId#of} knows; null
+   * otherwise, so an offset ({@code +01:00}, {@code Z}, {@code GMT+1}) or an unknown or invalid
+   * zone is dropped rather than forwarded.
+   */
+  @Nullable
+  public static String validAreaTimezone(@Nullable String areaTimezone) {
+    if (areaTimezone == null || !AREA_TIMEZONE.matcher(areaTimezone).matches()) {
+      return null;
+    }
+    try {
+      var zone = ZoneId.of(areaTimezone);
+      // ZoneId.of turns "GMT+1" into the region "GMT+01:00": only an id that is its own name is one.
+      return zone instanceof ZoneOffset || !zone.getId().equals(areaTimezone) ? null : areaTimezone;
+    } catch (DateTimeException e) {
+      return null;
+    }
+  }
+
+  /**
+   * The value of {@link #AREA_TIMEZONE_HEADER}: {@code <areaId>=<areaTimezone>}, or null (no
+   * header) when the zone is missing or invalid, or the area id is missing or not 1 to 128 of
+   * {@code [A-Za-z0-9._:-]} (so the value never splits on a second {@code =} nor breaks a header).
+   */
+  @Nullable
+  public static String areaTimezoneHeader(@Nullable String areaId, @Nullable String areaTimezone) {
+    var zone = validAreaTimezone(areaTimezone);
+    return areaId == null || zone == null || !AREA_ID.matcher(areaId).matches()
+      ? null
+      : areaId + "=" + zone;
   }
 
   /**
@@ -202,6 +363,35 @@ public class DemandResponsiveExtData implements Serializable {
     return acceptLanguage;
   }
 
+  /**
+   * Whether the caller wants the final legs: every DRT leg built as walk, DRT, walk from the
+   * provider's estimate (scheduled places, vehicle times, real walking seconds), with the
+   * estimates asked from the passenger's point and the transit stop. False keeps the
+   * walk + wait + car + walk leg of older callers.
+   */
+  public boolean finalLegs() {
+    return finalLegs;
+  }
+
+  /**
+   * The caller's request id (the quote's {@code X-Request-Id}), sent as {@link #REQUEST_ID_HEADER}
+   * on every DRT provider call of this request. Null when the caller sent none or an invalid one.
+   */
+  @Nullable
+  public String requestId() {
+    return requestId;
+  }
+
+  /**
+   * The IANA time zone of the request's area ({@code Europe/Madrid}), sent with the area as
+   * {@link #AREA_TIMEZONE_HEADER} on every DRT provider call of this request. Null when the caller
+   * sent none or an invalid one.
+   */
+  @Nullable
+  public String areaTimezone() {
+    return areaTimezone;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -217,7 +407,10 @@ public class DemandResponsiveExtData implements Serializable {
       Double.compare(egressReluctance, that.egressReluctance) == 0 &&
       accessBufferSeconds == that.accessBufferSeconds &&
       egressBufferSeconds == that.egressBufferSeconds &&
-      Objects.equals(acceptLanguage, that.acceptLanguage)
+      finalLegs == that.finalLegs &&
+      Objects.equals(acceptLanguage, that.acceptLanguage) &&
+      Objects.equals(requestId, that.requestId) &&
+      Objects.equals(areaTimezone, that.areaTimezone)
     );
   }
 
@@ -233,7 +426,10 @@ public class DemandResponsiveExtData implements Serializable {
       egressReluctance,
       accessBufferSeconds,
       egressBufferSeconds,
-      acceptLanguage
+      acceptLanguage,
+      finalLegs,
+      requestId,
+      areaTimezone
     );
   }
 
@@ -266,6 +462,14 @@ public class DemandResponsiveExtData implements Serializable {
       ", acceptLanguage='" +
       acceptLanguage +
       '\'' +
+      ", finalLegs=" +
+      finalLegs +
+      ", requestId='" +
+      requestId +
+      '\'' +
+      ", areaTimezone='" +
+      areaTimezone +
+      '\'' +
       '}'
     );
   }
@@ -285,6 +489,9 @@ public class DemandResponsiveExtData implements Serializable {
     private int accessBufferSeconds = DEFAULT_ACCESS_BUFFER_SECONDS;
     private int egressBufferSeconds = DEFAULT_EGRESS_BUFFER_SECONDS;
     private String acceptLanguage;
+    private boolean finalLegs;
+    private String requestId;
+    private String areaTimezone;
 
     public Builder paxAppId(String paxAppId) {
       this.paxAppId = paxAppId;
@@ -336,6 +543,21 @@ public class DemandResponsiveExtData implements Serializable {
       return this;
     }
 
+    public Builder finalLegs(boolean finalLegs) {
+      this.finalLegs = finalLegs;
+      return this;
+    }
+
+    public Builder requestId(String requestId) {
+      this.requestId = requestId;
+      return this;
+    }
+
+    public Builder areaTimezone(String areaTimezone) {
+      this.areaTimezone = areaTimezone;
+      return this;
+    }
+
     public DemandResponsiveExtData build() {
       return new DemandResponsiveExtData(
         paxAppId,
@@ -347,7 +569,10 @@ public class DemandResponsiveExtData implements Serializable {
         egressReluctance,
         accessBufferSeconds,
         egressBufferSeconds,
-        acceptLanguage
+        acceptLanguage,
+        finalLegs,
+        requestId,
+        areaTimezone
       );
     }
   }

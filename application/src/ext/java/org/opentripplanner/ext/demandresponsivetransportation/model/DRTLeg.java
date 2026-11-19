@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.time.ZonedDateTime;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.model.plan.Leg;
+import org.opentripplanner.model.plan.Place;
 import org.opentripplanner.model.plan.StreetLeg;
 import org.opentripplanner.model.plan.StreetLegBuilder;
 import org.slf4j.Logger;
@@ -180,6 +181,28 @@ public class DRTLeg extends StreetLeg {
       StreetLegBuilder.of(this)
         .withStartTime(getStartTime().plus(duration))
         .withEndTime(getEndTime().plus(duration)),
+      estimate,
+      waitingSeconds
+    );
+  }
+
+  /**
+   * The vehicle part of this leg only: from the scheduled pickup place to the scheduled dropoff
+   * place, at the vehicle's pickup and dropoff times, keeping the route geometry and the
+   * estimate. The walks before and after become legs of their own.
+   *
+   * @param pickup         the scheduled pickup place
+   * @param dropoff        the scheduled dropoff place
+   * @param waitingSeconds what the passenger waits at the pickup place for the vehicle
+   */
+  public DRTLeg toVehicleLeg(Place pickup, Place dropoff, long waitingSeconds) {
+    var zone = getStartTime().getZone();
+    return new DRTLeg(
+      StreetLegBuilder.of(this)
+        .withFrom(pickup)
+        .withTo(dropoff)
+        .withStartTime(Instant.ofEpochSecond(estimate.user_expected_pickup_time()).atZone(zone))
+        .withEndTime(Instant.ofEpochSecond(estimate.user_expected_dropoff_time()).atZone(zone)),
       estimate,
       waitingSeconds
     );

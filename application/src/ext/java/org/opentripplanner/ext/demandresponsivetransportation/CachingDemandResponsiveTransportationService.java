@@ -1,7 +1,11 @@
 package org.opentripplanner.ext.demandresponsivetransportation;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlArrivalEstimateResponse;
 import org.opentripplanner.ext.demandresponsivetransportation.service.shotl.ShotlBusinessRejectionException;
 import org.opentripplanner.framework.geometry.WgsCoordinate;
@@ -24,6 +28,18 @@ public abstract class CachingDemandResponsiveTransportationService
     CachingDemandResponsiveTransportationService.class
   );
 
+  /**
+   * Batch estimates are on unless the environment says OTP_DRT_BATCH_ESTIMATIONS=false: the
+   * rollback that needs no rides deploy.
+   */
+  private static final boolean BATCH_ENABLED =
+    !"false".equalsIgnoreCase(System.getenv("OTP_DRT_BATCH_ESTIMATIONS"));
+
+  /** After a provider answered that it has no batch route, try it again this much later. */
+  private static final Duration BATCH_RECHECK = Duration.ofMinutes(10);
+
+  private final AtomicLong batchUnsupportedUntil = new AtomicLong(0);
+
   @Override
   public ShotlArrivalEstimateResponse arrivalTimes(
     String paxAppId,
@@ -38,7 +54,9 @@ public abstract class CachingDemandResponsiveTransportationService
     DrtRequestContext context,
     List<PassengerFareType> passengerFareType,
     boolean pickupShift,
-    String acceptLanguage
+    String acceptLanguage,
+    String requestId,
+    String areaTimezone
   ) {
     LOG.debug(
       "[DRT] API CALL | context={} | areaId={} | from=({},{}) | to=({},{}) | pickupTime={} | " +
@@ -66,7 +84,9 @@ public abstract class CachingDemandResponsiveTransportationService
         context,
         passengerFareType,
         pickupShift,
-        acceptLanguage
+        acceptLanguage,
+        requestId,
+        areaTimezone
       );
 
       LOG.debug(
@@ -118,6 +138,132 @@ public abstract class CachingDemandResponsiveTransportationService
     DrtRequestContext context,
     List<PassengerFareType> passengerFareType,
     boolean pickupShift,
-    String acceptLanguage
+    String acceptLanguage,
+    String requestId,
+    String areaTimezone
   );
+
+  /**
+   * One call for the whole batch when the provider serves batches. A provider without the
+   * route (404/405) is asked leg by leg instead, and asked for batches again ten minutes later.
+   * Any other failure of the batch leaves every leg of the phase without an estimate: retrying
+   * leg by leg would double the load on a provider that is already failing.
+   */
+  @Override
+  public List<ShotlArrivalEstimateResponse> arrivalTimesBatch(
+    String paxAppId,
+    String areaId,
+    String userId,
+    String rideType,
+    int regularPassengers,
+    int wheelchairPassengers,
+    DrtRequestContext context,
+    List<PassengerFareType> passengerFareType,
+    boolean pickupShift,
+    String acceptLanguage,
+    String requestId,
+    String areaTimezone,
+    List<DrtEstimateItem> items
+  ) {
+    if (items.isEmpty()) {
+      return List.of();
+    }
+    if (!BATCH_ENABLED || System.currentTimeMillis() < batchUnsupportedUntil.get()) {
+      return DemandResponsiveTransportationService.super.arrivalTimesBatch(
+        paxAppId,
+        areaId,
+        userId,
+        rideType,
+        regularPassengers,
+        wheelchairPassengers,
+        context,
+        passengerFareType,
+        pickupShift,
+        acceptLanguage,
+        requestId,
+        areaTimezone,
+        items
+      );
+    }
+    try {
+      var answers = queryArrivalTimesBatch(
+        paxAppId,
+        areaId,
+        userId,
+        rideType,
+        regularPassengers,
+        wheelchairPassengers,
+        context,
+        passengerFareType,
+        pickupShift,
+        acceptLanguage,
+        requestId,
+        areaTimezone,
+        items
+      );
+      LOG.info(
+        "[DRT] BATCH | context={} | areaId={} | items={} | estimated={}",
+        context,
+        areaId,
+        items.size(),
+        answers.stream().filter(a -> a != null).count()
+      );
+      return answers;
+    } catch (BatchEstimatesUnsupportedException unsupported) {
+      batchUnsupportedUntil.set(System.currentTimeMillis() + BATCH_RECHECK.toMillis());
+      LOG.warn(
+        "[DRT] BATCH UNSUPPORTED | context={} | areaId={} | {} | asking leg by leg for {}",
+        context,
+        areaId,
+        unsupported.getMessage(),
+        BATCH_RECHECK
+      );
+      return DemandResponsiveTransportationService.super.arrivalTimesBatch(
+        paxAppId,
+        areaId,
+        userId,
+        rideType,
+        regularPassengers,
+        wheelchairPassengers,
+        context,
+        passengerFareType,
+        pickupShift,
+        acceptLanguage,
+        requestId,
+        areaTimezone,
+        items
+      );
+    } catch (Exception e) {
+      LOG.error(
+        "[DRT] BATCH ERROR | context={} | areaId={} | items={} | error={} | the legs of this phase go without an estimate",
+        context,
+        areaId,
+        items.size(),
+        e.getMessage()
+      );
+      return new ArrayList<>(Collections.nCopies(items.size(), null));
+    }
+  }
+
+  /**
+   * Query the DRT service for the estimates of a batch, one per item in order (null where a leg
+   * has none). Providers without batches keep this default.
+   */
+  protected List<ShotlArrivalEstimateResponse> queryArrivalTimesBatch(
+    String paxAppId,
+    String areaId,
+    String userId,
+    String rideType,
+    int regularPassengers,
+    int wheelchairPassengers,
+    DrtRequestContext context,
+    List<PassengerFareType> passengerFareType,
+    boolean pickupShift,
+    String acceptLanguage,
+    String requestId,
+    String areaTimezone,
+    List<DrtEstimateItem> items
+  ) {
+    throw new BatchEstimatesUnsupportedException("this provider has no batch estimates");
+  }
 }
