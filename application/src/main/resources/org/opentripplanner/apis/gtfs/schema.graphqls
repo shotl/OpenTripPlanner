@@ -4145,6 +4145,14 @@ input DRTInput {
   "Area ID for the DRT service."
   areaId: String
   """
+  The IANA time zone of the area (`Europe/Madrid`), sent with `areaId` as the
+  `X-Area-Timezone: <areaId>=<zone>` header on every call OTP makes to the DRT provider for this
+  request, so the provider need not look the zone up. A region id of at most 64 characters of
+  letters, digits and `/` `_` `+` `-`; an offset (`+01:00`) or an unknown zone is ignored, and no
+  header is sent without `areaId`.
+  """
+  areaTimezone: String
+  """
   Minimum buffer time (in seconds) added after transit arrival before requesting DRT pickup
   (egress legs). Protects against the DRT vehicle arriving and leaving before the passenger
   gets off transit and walks to the pickup point. Default 0 (no buffer).
@@ -4158,12 +4166,27 @@ input DRTInput {
   itineraries from being unfairly filtered out when DRT is used as egress mode.
   """
   egressReluctance: Float = 1.0
+  """
+  Build the final legs: every DRT leg as walk, DRT, walk from the provider's estimate. The DRT
+  leg runs between the scheduled pickup and dropoff places at the vehicle's times, each walk
+  keeps its real duration (left out only when zero), the estimates are asked from the
+  passenger's point and the transit stop, and a connection the real times cannot make removes
+  the itinerary (the margin is accessBufferSeconds / egressBufferSeconds). Default false: the
+  DRT leg is the walk + wait + car + walk leg.
+  """
+  finalLegs: Boolean = false
   "Optional passenger fare types for pricing calculation."
   passengerFareType: [DRTPassengerFareTypeInput!]
   "Passenger information for the DRT ride."
   passengers: DRTPassengersInput
   "passenger app id"
   paxAppId: String
+  """
+  The caller's request id, sent as the `X-Request-Id` header on every call OTP makes to the DRT
+  provider for this request, so one id follows the request across services. 1 to 128 characters
+  of letters, digits and `.` `_` `:` `-`; any other value is ignored.
+  """
+  requestId: String
   "Type of ride requested."
   rideType: String
   "User ID for the DRT service."

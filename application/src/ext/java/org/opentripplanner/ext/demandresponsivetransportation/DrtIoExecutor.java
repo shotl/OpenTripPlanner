@@ -15,6 +15,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * This executor provides a fixed pool of daemon threads sized to match the HTTP
  * connection pool ({@code DRT_MAX_CONN_PER_ROUTE = 20}), enabling concurrent
  * Shotl API calls regardless of CPU core count.
+ * <p>
+ * Every task runs under the log context of the thread that submitted it (see
+ * {@link DrtLogContext}), so the request's {@code correlationId} is on the DRT log lines.
  */
 public final class DrtIoExecutor {
 
@@ -27,13 +30,12 @@ public final class DrtIoExecutor {
 
   private static final AtomicInteger THREAD_COUNT = new AtomicInteger(0);
 
-  private static final ExecutorService INSTANCE = Executors.newFixedThreadPool(
-    DRT_IO_THREADS,
-    r -> {
+  private static final ExecutorService INSTANCE = DrtLogContext.propagating(
+    Executors.newFixedThreadPool(DRT_IO_THREADS, r -> {
       Thread t = new Thread(r, "drt-io-" + THREAD_COUNT.getAndIncrement());
       t.setDaemon(true);
       return t;
-    }
+    })
   );
 
   public static ExecutorService getInstance() {

@@ -131,6 +131,36 @@ class DemandResponsiveTransportationAccessShifterTest {
   }
 
   @Test
+  void testShiftAccessesSendsTheRequestIdAndAreaTimezone() {
+    var drivingState = TestStateBuilder.ofDriving().streetEdge().streetEdge().build();
+    var access = new DefaultAccessEgress(0, drivingState);
+    var recording = new TestDemandResponsiveTransportationService();
+    RouteRequest req = createRouteRequest(NOW);
+    req.setDemandResponsiveExtData(
+      DemandResponsiveExtData.builder()
+        .paxAppId("test-app-id")
+        .userId("test-user-id")
+        .areaId("test-area-id")
+        .rideType("SHARED")
+        .passengers(new Passengers(1, 0))
+        .requestId("quote-9")
+        .areaTimezone("Europe/Madrid")
+        .build()
+    );
+
+    DemandResponsiveTransportationAccessShifter.shiftAccesses(
+      true,
+      List.of(access),
+      List.of(recording),
+      req,
+      NOW
+    );
+
+    assertEquals(List.of("quote-9"), recording.requestIds);
+    assertEquals(List.of("Europe/Madrid"), recording.areaTimezones);
+  }
+
+  @Test
   void testShiftAccessesOnlyForDrtMode() {
     var walkingState = TestStateBuilder.ofWalking().streetEdge().build();
     var access = new DefaultAccessEgress(0, walkingState);
