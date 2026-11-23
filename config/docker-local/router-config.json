@@ -3,8 +3,8 @@
         {
             "type": "shotl-demand-responsive-transportation",
             "enabled": true,
-            "estimationsURL": "http://localhost:60011/",
-            "areasURL": "http://localhost:60000/",
+            "estimationsURL": "http://rides/",
+            "areasURL": "http://areas/",
             "providerName": "Shotl"
         }
     ],
