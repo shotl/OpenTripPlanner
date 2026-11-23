@@ -6,19 +6,18 @@ app:
   # Production environment specific environment vars
   environment: {}
 
-  # Other pods in the same node might suffer when otp-server is starting
+  # --max-memory 3 is the JVM heap (-Xmx3G, script/entrypoint.sh): the limit leaves 1Gi above it
+  # for metaspace, threads and native memory; at 3Gi the heap alone could fill the container.
+  # Requests from 2 weeks of production (2026-11, ADR 0012): ~1.9Gi peak; 250m covers startup,
+  # the CPU peak, after every daily graph rebuild.
   resources:
     limits:
-      memory: 3Gi
+      memory: 4Gi
     requests:
-      cpu: 500m
-      memory: 2Gi
+      cpu: 250m
+      memory: 2336Mi
 
+  # On-demand in production (a single replica). The memory pool is folded into general
+  # (ADR 0012 §4b).
   nodeSelector:
-    shotl.com/workload-type: memory-intensive
-
-  tolerations:
-    - key: shotl.com/workload-type
-      operator: Equal
-      value: memory-intensive
-      effect: NoSchedule
+    karpenter.sh/capacity-type: on-demand
